@@ -106,15 +106,21 @@ export const useAuthStore = defineStore('auth', () => {
 
     if (storedToken) {
       token.value = storedToken
+
+      if (storedUser) {
+        try {
+          user.value = JSON.parse(storedUser)
+        } catch (err) {
+          console.error('Failed to parse stored user from localStorage:', err)
+          localStorage.removeItem('user')
+        }
+      }
       
       // Try to fetch fresh user data from API
       try {
         await fetchUser()
       } catch (err) {
-        // If API call fails, fall back to stored user data
-        if (storedUser) {
-          user.value = JSON.parse(storedUser)
-        }
+        console.error('initAuth: failed to refresh user data', err)
       }
     }
   }
