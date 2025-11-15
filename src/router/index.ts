@@ -46,6 +46,17 @@ const router = createRouter({
 // Navigation guard
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
+  const redirectTo = (target: ReturnType<typeof getDefaultRouteForUser>) => {
+    const resolvedTarget = router.resolve(target)
+
+    if (resolvedTarget.fullPath === to.fullPath) {
+      next()
+      return true
+    }
+
+    next(target)
+    return true
+  }
 
   if (to.meta?.requiresAuth && !authStore.isAuthenticated) {
     next({ name: 'login', query: { redirect: to.fullPath } })
@@ -53,13 +64,13 @@ router.beforeEach((to, from, next) => {
   }
 
   if (to.meta?.requiresGuest && authStore.isAuthenticated) {
-    next(getDefaultRouteForUser(authStore.user))
+    redirectTo(getDefaultRouteForUser(authStore.user))
     return
   }
 
   const allowedRoles = to.meta?.allowedRoles
   if (allowedRoles && authStore.user && !allowedRoles.includes(authStore.user.role)) {
-    next(getDefaultRouteForUser(authStore.user))
+    redirectTo(getDefaultRouteForUser(authStore.user))
     return
   }
 
