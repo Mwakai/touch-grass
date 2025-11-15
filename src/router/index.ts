@@ -25,6 +25,17 @@ const router = createRouter({
       name: 'dashboard',
       component: () => import('@/views/DashboardView.vue'),
     },
+    {
+      path: '/add-kid',
+      name: 'add-kid',
+      component: () => import('@/views/AddKidView.vue'),
+    },
+    {
+      path: '/kids/:kidId',
+      name: 'kid-dashboard',
+      component: () => import('@/views/KidDashboardView.vue'),
+      props: true,
+    },
   ],
 })
 
