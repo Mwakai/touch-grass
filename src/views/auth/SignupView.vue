@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { getDefaultRouteForUser } from '@/utils/authRedirect'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -52,8 +53,8 @@ const handleSignup = async () => {
   }
 
   try {
-    await authStore.signup(email.value, password.value, selectedRole.value)
-    router.push('/dashboard')
+    const response = await authStore.signup(email.value, password.value, selectedRole.value)
+    router.push(getDefaultRouteForUser(response?.user ?? authStore.user))
   } catch (e) {
     error.value = 'Signup failed. Please try again.'
   }
