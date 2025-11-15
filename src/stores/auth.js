@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
+import { api } from '@/services/api'
 
 export const useAuthStore = defineStore('auth', () => {
   // State
@@ -19,28 +20,19 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      // Mock successful login
-      const mockToken = 'mock-token-' + Math.random().toString(36).substring(7)
-      const mockUser = {
-        id: 1,
-        email: email,
-        role: 'parent' // Default role for login
-      }
+      const response = await api.login({ email, password })
 
       // Store token in localStorage
-      localStorage.setItem('token', mockToken)
-      localStorage.setItem('user', JSON.stringify(mockUser))
+      localStorage.setItem('token', response.token)
+      localStorage.setItem('user', JSON.stringify(response.user))
 
       // Update state
-      token.value = mockToken
-      user.value = mockUser
+      token.value = response.token
+      user.value = response.user
 
-      return { user: mockUser, token: mockToken }
+      return response
     } catch (err) {
-      error.value = 'Login failed. Please try again.'
+      error.value = err.message || 'Login failed. Please try again.'
       throw err
     } finally {
       loading.value = false
@@ -52,53 +44,78 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      // Mock successful signup
-      const mockToken = 'mock-token-' + Math.random().toString(36).substring(7)
-      const mockUser = {
-        id: Date.now(),
-        email: email,
-        role: role
-      }
+      const response = await api.signup({ email, password, role })
 
       // Store token and user in localStorage
-      localStorage.setItem('token', mockToken)
-      localStorage.setItem('user', JSON.stringify(mockUser))
+      localStorage.setItem('token', response.token)
+      localStorage.setItem('user', JSON.stringify(response.user))
 
       // Update state
-      token.value = mockToken
-      user.value = mockUser
+      token.value = response.token
+      user.value = response.user
 
-      return { user: mockUser, token: mockToken }
+      return response
     } catch (err) {
-      error.value = 'Signup failed. Please try again.'
+      error.value = err.message || 'Signup failed. Please try again.'
       throw err
     } finally {
       loading.value = false
     }
   }
 
-  const logout = () => {
-    // Clear localStorage
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+  const logout = async () => {
+    try {
+      // Call logout endpoint
+      await api.logout()
+    } catch (err) {
+      console.error('Logout API call failed:', err)
+      // Continue with local logout even if API call fails
+    } finally {
+      // Clear localStorage
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
 
-    // Clear state
-    token.value = null
-    user.value = null
-    error.value = null
+      // Clear state
+      token.value = null
+      user.value = null
+      error.value = null
+    }
+  }
+
+  const fetchUser = async () => {
+    if (!token.value) return
+
+    loading.value = true
+    try {
+      const response = await api.getMe()
+      user.value = response.user
+      localStorage.setItem('user', JSON.stringify(response.user))
+    } catch (err) {
+      console.error('Failed to fetch user:', err)
+      // If token is invalid, clear auth state
+      await logout()
+    } finally {
+      loading.value = false
+    }
   }
 
   // Initialize user from localStorage if token exists
-  const initAuth = () => {
+  const initAuth = async () => {
     const storedToken = localStorage.getItem('token')
     const storedUser = localStorage.getItem('user')
 
-    if (storedToken && storedUser) {
+    if (storedToken) {
       token.value = storedToken
-      user.value = JSON.parse(storedUser)
+      
+      // Try to fetch fresh user data from API
+      try {
+        await fetchUser()
+      } catch (err) {
+        // If API call fails, fall back to stored user data
+        if (storedUser) {
+          user.value = JSON.parse(storedUser)
+        }
+      }
     }
   }
 
@@ -119,6 +136,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     signup,
     logout,
+    fetchUser,
     initAuth
   }
 })
