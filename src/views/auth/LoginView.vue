@@ -1,10 +1,11 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getDefaultRouteForUser } from '@/utils/authRedirect'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 const email = ref('')
@@ -14,6 +15,16 @@ const error = ref('')
 const validateEmail = (email) => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return re.test(email)
+}
+
+const redirectAfterAuth = (maybeUser) => {
+  const target = getDefaultRouteForUser(maybeUser ?? authStore.user)
+
+  if (target.name === route.name && route.fullPath === router.resolve(target).fullPath) {
+    return
+  }
+
+  router.replace(target)
 }
 
 const handleLogin = async () => {
@@ -32,11 +43,21 @@ const handleLogin = async () => {
 
   try {
     const response = await authStore.login(email.value, password.value)
-    router.push(getDefaultRouteForUser(response?.user ?? authStore.user))
+    redirectAfterAuth(response?.user)
   } catch (e) {
     error.value = 'Invalid email or password'
   }
 }
+
+watch(
+  () => (authStore.isAuthenticated ? authStore.user : null),
+  (maybeUser) => {
+    if (maybeUser && route.name === 'login') {
+      redirectAfterAuth(maybeUser)
+    }
+  },
+  { immediate: true }
+)
 
 const clearError = () => {
   error.value = ''
