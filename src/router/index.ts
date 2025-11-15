@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { getDefaultRouteForUser } from '@/utils/authRedirect'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -24,17 +25,20 @@ const router = createRouter({
       path: '/dashboard',
       name: 'dashboard',
       component: () => import('@/views/DashboardView.vue'),
+      meta: { requiresAuth: true, allowedRoles: ['parent'] },
     },
     {
       path: '/add-kid',
       name: 'add-kid',
       component: () => import('@/views/AddKidView.vue'),
+      meta: { requiresAuth: true, allowedRoles: ['parent'] },
     },
     {
-      path: '/kids/:kidId',
+      path: '/kids/:kidId?',
       name: 'kid-dashboard',
       component: () => import('@/views/KidDashboardView.vue'),
       props: true,
+      meta: { requiresAuth: true, allowedRoles: ['kid'] },
     },
   ],
 })
@@ -43,12 +47,23 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
 
-  if (to.meta.requiresGuest && authStore.isAuthenticated) {
-    // Redirect authenticated users away from login/signup
-    next('/dashboard')
-  } else {
-    next()
+  if (to.meta?.requiresAuth && !authStore.isAuthenticated) {
+    next({ name: 'login', query: { redirect: to.fullPath } })
+    return
   }
+
+  if (to.meta?.requiresGuest && authStore.isAuthenticated) {
+    next(getDefaultRouteForUser(authStore.user))
+    return
+  }
+
+  const allowedRoles = to.meta?.allowedRoles
+  if (allowedRoles && authStore.user && !allowedRoles.includes(authStore.user.role)) {
+    next(getDefaultRouteForUser(authStore.user))
+    return
+  }
+
+  next()
 })
 
 export default router

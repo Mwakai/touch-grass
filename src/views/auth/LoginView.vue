@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { getDefaultRouteForUser } from '@/utils/authRedirect'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -30,8 +31,8 @@ const handleLogin = async () => {
   }
 
   try {
-    await authStore.login(email.value, password.value)
-    router.push('/dashboard')
+    const response = await authStore.login(email.value, password.value)
+    router.push(getDefaultRouteForUser(response?.user ?? authStore.user))
   } catch (e) {
     error.value = 'Invalid email or password'
   }
