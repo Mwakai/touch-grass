@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getDefaultRouteForUser } from '@/utils/authRedirect'
@@ -53,10 +53,15 @@ const handleSignup = async () => {
   }
 
   try {
-    const response = await authStore.signup(email.value, password.value, selectedRole.value)
-    router.push(getDefaultRouteForUser(response?.user ?? authStore.user))
+    await authStore.signup(email.value, password.value, selectedRole.value)
+    // Wait for Vue reactivity to complete, then redirect
+    await nextTick()
+    const target = getDefaultRouteForUser(authStore.user)
+    console.log('Redirecting after signup to:', target)
+    await router.push(target)
   } catch (e) {
     error.value = 'Signup failed. Please try again.'
+    console.error('Signup error:', e)
   }
 }
 

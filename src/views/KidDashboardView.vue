@@ -1,17 +1,56 @@
 <script setup lang="ts">
 import { computed, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { getKidById, mockKids, type KidChallenge } from '@/data/kids'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const kidId = computed(() => route.params.kidId as string | undefined)
-const kid = computed(() => (kidId.value ? getKidById(kidId.value) : mockKids[0]))
+
+// Use logged-in user's data for the kid, or try to find in mock data
+const kid = computed(() => {
+  // If the logged-in user is a kid, use their data
+  if (authStore.user?.role === 'kid') {
+    // Try to get kid from mock data, or create from auth user
+    const mockKid = kidId.value ? getKidById(kidId.value) : null
+
+    if (mockKid) {
+      return mockKid
+    }
+
+    // Create kid object from logged-in user
+    return {
+      id: String(authStore.user.id),
+      name: authStore.user.name || authStore.user.email?.split('@')[0] || 'Explorer',
+      email: authStore.user.email,
+      age: 10, // Default age, can be updated when you add it to backend
+      avatarGradient: 'from-blue-400 to-purple-500',
+      points: 0,
+      stats: {
+        challenges: 0,
+        badges: 0,
+        outdoorMinutes: 0
+      },
+      quickStats: [
+        { id: 'streak', label: 'Current Streak', value: '0 days', description: 'Keep going!' },
+        { id: 'week', label: 'This Week', value: '0 pts', description: 'Points earned' },
+        { id: 'rank', label: 'Rank', value: 'Explorer', description: 'Current level' }
+      ],
+      challenges: mockKids[0]?.challenges || [],
+      badges: []
+    }
+  }
+
+  // Fallback to mock data
+  return kidId.value ? getKidById(kidId.value) : mockKids[0]
+})
 
 watchEffect(() => {
-  if (!kid.value) {
-    router.replace({ name: 'dashboard' })
+  if (!authStore.user) {
+    router.replace({ name: 'login' })
   }
 })
 
@@ -41,17 +80,32 @@ const challengeCardClasses = (challenge: KidChallenge) => {
       return 'bg-white border border-transparent text-slate-800 shadow-md shadow-slate-200'
   }
 }
+
+const handleLogout = async () => {
+  try {
+    await authStore.logout()
+    console.log('Logout successful, redirecting to login')
+    await router.push('/login')
+  } catch (error) {
+    console.error('Logout error:', error)
+    // Still redirect to login even if logout fails
+    await router.push('/login')
+  }
+}
 </script>
 
 <template>
   <div v-if="kid" class="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white pb-24">
     <header class="px-6 pt-6">
-      <button
-        class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-        @click="router.push({ name: 'dashboard' })"
-      >
-        ← Back
-      </button>
+      <div class="flex items-center justify-end gap-3">
+        <button
+          class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+          @click="handleLogout"
+        >
+          <span class="text-base">🚪</span>
+          Logout
+        </button>
+      </div>
     </header>
 
     <section class="px-6 pb-8 pt-6">

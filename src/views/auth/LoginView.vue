@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getDefaultRouteForUser } from '@/utils/authRedirect'
@@ -42,10 +42,15 @@ const handleLogin = async () => {
   }
 
   try {
-    const response = await authStore.login(email.value, password.value)
-    redirectAfterAuth(response?.user)
+    await authStore.login(email.value, password.value)
+    // Wait for Vue reactivity to complete, then redirect
+    await nextTick()
+    const target = getDefaultRouteForUser(authStore.user)
+    console.log('Redirecting after login to:', target)
+    await router.push(target)
   } catch (e) {
     error.value = 'Invalid email or password'
+    console.error('Login error:', e)
   }
 }
 

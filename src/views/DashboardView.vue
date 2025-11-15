@@ -13,15 +13,22 @@ const kids = ref(mockKids)
 const hasKids = computed(() => kids.value.length > 0)
 
 const bottomNavItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: '🏡', to: '/dashboard' },
-  { id: 'kids', label: 'Kids', icon: '🧒', to: '/dashboard' },
-  { id: 'add', label: 'Add Kid', icon: '➕', to: '/add-kid' },
-  { id: 'settings', label: 'Settings', icon: '⚙️', to: '/dashboard' },
+  { id: 'dashboard', label: 'Dashboard', icon: '🏡', to: '/dashboard', action: null },
+  { id: 'kids', label: 'Kids', icon: '🧒', to: '/dashboard', action: null },
+  { id: 'add', label: 'Add Kid', icon: '➕', to: '/add-kid', action: null },
+  { id: 'logout', label: 'Logout', icon: '🚪', to: null, action: 'logout' },
 ]
 
-const handleLogout = () => {
-  authStore.logout()
-  router.push('/login')
+const handleLogout = async () => {
+  try {
+    await authStore.logout()
+    console.log('Logout successful, redirecting to login')
+    await router.push('/login')
+  } catch (error) {
+    console.error('Logout error:', error)
+    // Still redirect to login even if logout fails
+    await router.push('/login')
+  }
 }
 
 const openAddKid = () => {
@@ -34,6 +41,14 @@ const openKid = (kidId: string) => {
 
 const isActiveNav = (path: string) => {
   return route.path === path
+}
+
+const handleNavClick = (item: any) => {
+  if (item.action === 'logout') {
+    handleLogout()
+  } else if (item.to) {
+    router.push(item.to)
+  }
 }
 </script>
 
@@ -128,8 +143,8 @@ const isActiveNav = (path: string) => {
           v-for="item in bottomNavItems"
           :key="item.id"
           class="flex flex-1 flex-col items-center gap-1 rounded-2xl px-2 py-1 text-xs font-medium transition"
-          :class="isActiveNav(item.to) ? 'text-emerald-600' : 'text-slate-400'"
-          @click="router.push(item.to)"
+          :class="item.to && isActiveNav(item.to) ? 'text-emerald-600' : 'text-slate-400'"
+          @click="handleNavClick(item)"
         >
           <span class="text-lg">{{ item.icon }}</span>
           {{ item.label }}

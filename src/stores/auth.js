@@ -10,7 +10,7 @@ export const useAuthStore = defineStore('auth', () => {
   const error = ref(null)
 
   // Computed
-  const isAuthenticated = computed(() => !!token.value)
+  const isAuthenticated = computed(() => !!token.value && !!user.value)
   const isParent = computed(() => user.value?.role === 'parent')
   const isKid = computed(() => user.value?.role === 'kid')
 
@@ -22,17 +22,46 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const response = await api.login({ email, password })
 
+      console.log('Login response:', response)
+
+      // Handle different response structures
+      // Backend returns: {success: true, token: "...", data: {id, email, role, ...}}
+      let authToken = response.token
+      let userData = response.data
+
+      // Fallback: check if token and user are nested in data
+      if (!authToken && response.data?.token) {
+        authToken = response.data.token
+      }
+      if (!userData && response.user) {
+        userData = response.user
+      }
+
+      if (!authToken || !userData) {
+        console.error('Invalid login response structure:', response)
+        throw new Error('Invalid response from server')
+      }
+
+      console.log('Extracted auth data:', { token: authToken, user: userData })
+
       // Store token in localStorage
-      localStorage.setItem('token', response.token)
-      localStorage.setItem('user', JSON.stringify(response.user))
+      localStorage.setItem('token', authToken)
+      localStorage.setItem('user', JSON.stringify(userData))
 
       // Update state
-      token.value = response.token
-      user.value = response.user
+      token.value = authToken
+      user.value = userData
 
-      return response
+      console.log('Auth state updated:', {
+        user: user.value,
+        token: token.value,
+        isAuthenticated: isAuthenticated.value
+      })
+
+      return { token: authToken, user: userData }
     } catch (err) {
       error.value = err.message || 'Login failed. Please try again.'
+      console.error('Login failed in auth store:', err)
       throw err
     } finally {
       loading.value = false
@@ -46,17 +75,46 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const response = await api.signup({ email, password, role })
 
+      console.log('Signup response:', response)
+
+      // Handle different response structures
+      // Backend returns: {success: true, token: "...", data: {id, email, role, ...}}
+      let authToken = response.token
+      let userData = response.data
+
+      // Fallback: check if token and user are nested in data
+      if (!authToken && response.data?.token) {
+        authToken = response.data.token
+      }
+      if (!userData && response.user) {
+        userData = response.user
+      }
+
+      if (!authToken || !userData) {
+        console.error('Invalid signup response structure:', response)
+        throw new Error('Invalid response from server')
+      }
+
+      console.log('Extracted signup data:', { token: authToken, user: userData })
+
       // Store token and user in localStorage
-      localStorage.setItem('token', response.token)
-      localStorage.setItem('user', JSON.stringify(response.user))
+      localStorage.setItem('token', authToken)
+      localStorage.setItem('user', JSON.stringify(userData))
 
       // Update state
-      token.value = response.token
-      user.value = response.user
+      token.value = authToken
+      user.value = userData
 
-      return response
+      console.log('Signup auth state updated:', {
+        user: user.value,
+        token: token.value,
+        isAuthenticated: isAuthenticated.value
+      })
+
+      return { token: authToken, user: userData }
     } catch (err) {
       error.value = err.message || 'Signup failed. Please try again.'
+      console.error('Signup failed in auth store:', err)
       throw err
     } finally {
       loading.value = false
@@ -88,8 +146,15 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       const response = await api.getMe()
-      user.value = response.user
-      localStorage.setItem('user', JSON.stringify(response.user))
+      console.log('fetchUser response:', response)
+
+      // Handle different response structures
+      const userData = response.user || response.data || response
+
+      user.value = userData
+      localStorage.setItem('user', JSON.stringify(userData))
+
+      console.log('User data set:', userData)
     } catch (err) {
       console.error('Failed to fetch user:', err)
       // If token is invalid, clear auth state
@@ -104,10 +169,10 @@ export const useAuthStore = defineStore('auth', () => {
     const storedToken = localStorage.getItem('token')
     const storedUser = localStorage.getItem('user')
 
-    if (storedToken) {
+    if (storedToken && storedToken !== 'null' && storedToken !== 'undefined') {
       token.value = storedToken
 
-      if (storedUser) {
+      if (storedUser && storedUser !== 'null' && storedUser !== 'undefined') {
         try {
           user.value = JSON.parse(storedUser)
         } catch (err) {
@@ -115,13 +180,17 @@ export const useAuthStore = defineStore('auth', () => {
           localStorage.removeItem('user')
         }
       }
-      
+
       // Try to fetch fresh user data from API
       try {
         await fetchUser()
       } catch (err) {
         console.error('initAuth: failed to refresh user data', err)
       }
+    } else {
+      // Clean up invalid tokens
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
     }
   }
 
