@@ -2,12 +2,25 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/services/api'
 
+interface User {
+  id: number
+  email: string
+  role: string
+  name?: string
+}
+
+interface AuthResponse {
+  token?: string
+  data?: User
+  user?: User
+}
+
 export const useAuthStore = defineStore('auth', () => {
   // State
-  const user = ref(null)
-  const token = ref(localStorage.getItem('token') || null)
+  const user = ref<User | null>(null)
+  const token = ref<string | null>(localStorage.getItem('token') || null)
   const loading = ref(false)
-  const error = ref(null)
+  const error = ref<string | null>(null)
 
   // Computed
   const isAuthenticated = computed(() => !!token.value && !!user.value)
@@ -15,12 +28,12 @@ export const useAuthStore = defineStore('auth', () => {
   const isKid = computed(() => user.value?.role === 'kid')
 
   // Actions
-  const login = async (email, password) => {
+  const login = async (email: string, password: string) => {
     loading.value = true
     error.value = null
 
     try {
-      const response = await api.login({ email, password })
+      const response = await api.login({ email, password }) as unknown as AuthResponse
 
       console.log('Login response:', response)
 
@@ -30,8 +43,8 @@ export const useAuthStore = defineStore('auth', () => {
       let userData = response.data
 
       // Fallback: check if token and user are nested in data
-      if (!authToken && response.data?.token) {
-        authToken = response.data.token
+      if (!authToken && response.data && 'token' in response.data) {
+        authToken = (response.data as any).token
       }
       if (!userData && response.user) {
         userData = response.user
@@ -60,7 +73,8 @@ export const useAuthStore = defineStore('auth', () => {
 
       return { token: authToken, user: userData }
     } catch (err) {
-      error.value = err.message || 'Login failed. Please try again.'
+      const message = err instanceof Error ? err.message : 'Login failed. Please try again.'
+      error.value = message
       console.error('Login failed in auth store:', err)
       throw err
     } finally {
@@ -68,12 +82,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const signup = async (email, password, role) => {
+  const signup = async (email: string, password: string, role: string) => {
     loading.value = true
     error.value = null
 
     try {
-      const response = await api.signup({ email, password, role })
+      const response = await api.signup({ email, password, role }) as unknown as AuthResponse
 
       console.log('Signup response:', response)
 
@@ -83,8 +97,8 @@ export const useAuthStore = defineStore('auth', () => {
       let userData = response.data
 
       // Fallback: check if token and user are nested in data
-      if (!authToken && response.data?.token) {
-        authToken = response.data.token
+      if (!authToken && response.data && 'token' in response.data) {
+        authToken = (response.data as any).token
       }
       if (!userData && response.user) {
         userData = response.user
@@ -113,7 +127,8 @@ export const useAuthStore = defineStore('auth', () => {
 
       return { token: authToken, user: userData }
     } catch (err) {
-      error.value = err.message || 'Signup failed. Please try again.'
+      const message = err instanceof Error ? err.message : 'Signup failed. Please try again.'
+      error.value = message
       console.error('Signup failed in auth store:', err)
       throw err
     } finally {
@@ -149,9 +164,9 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('fetchUser response:', response)
 
       // Handle different response structures
-      const userData = response.user || response.data || response
+      const userData = response.user || (response as any).data || response
 
-      user.value = userData
+      user.value = userData as User
       localStorage.setItem('user', JSON.stringify(userData))
 
       console.log('User data set:', userData)

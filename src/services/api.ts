@@ -21,7 +21,8 @@ interface AuthResponse {
 }
 
 class ApiClient {
-  private baseURL = '/api'
+  // Use ngrok URL for production/mobile, fallback to proxy for web dev
+  private baseURL = import.meta.env.VITE_API_URL || 'https://fd112b3ec1da.ngrok-free.app/api'
 
   private async request<T>(
     endpoint: string,

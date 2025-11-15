@@ -36,7 +36,7 @@ const interestOptions: Interest[] = [
 const form = ref({
   name: '',
   age: '',
-  color: colorOptions[0].gradient,
+  color: colorOptions[0]?.gradient ?? '',
   interests: [] as string[],
 })
 
