@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">touch-grass</string>
+    <string name="title_activity_main">touch-grass</string>
+    <string name="package_name">com.mwakai.app</string>
+    <string name="custom_url_scheme">com.mwakai.app</string>
+</resources>
