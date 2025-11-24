@@ -172,13 +172,44 @@ This will trigger release builds for both Android (AAB) and iOS (IPA).
 
 ### Local Mobile Development
 
+#### Android Setup
+
+1. Install [Android Studio](https://developer.android.com/studio)
+2. Install Android SDK (via Android Studio)
+3. Copy `android/local.properties.example` to `android/local.properties`
+4. Update the `sdk.dir` path in `local.properties` to point to your Android SDK location
+
 ```sh
-# Sync web assets with mobile projects
-npx cap sync
+# Sync web assets with Android project
+npx cap sync android
 
 # Open in Android Studio
 npx cap open android
+```
+
+#### iOS Setup
+
+1. Install [Xcode](https://apps.apple.com/app/xcode/id497799835) (macOS only)
+2. Install CocoaPods: `sudo gem install cocoapods`
+
+```sh
+# Sync web assets with iOS project
+npx cap sync ios
+
+# Install CocoaPods dependencies
+cd ios/App && pod install && cd ../..
 
 # Open in Xcode
 npx cap open ios
 ```
+
+### Troubleshooting
+
+**Android Build Issues:**
+- Ensure `android/gradle.properties` does NOT contain `org.gradle.java.home` (it should be managed by your system)
+- Ensure `android/local.properties` exists with the correct SDK path
+- Make sure Java 17 is installed
+
+**iOS Build Issues:**
+- Run `pod install` in `ios/App` directory if you encounter CocoaPods errors
+- Ensure you have the latest Xcode command line tools: `xcode-select --install`

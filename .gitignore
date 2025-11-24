@@ -34,3 +34,21 @@ coverage
 
 # Vitest
 __screenshots__/
+
+# Android
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+android/.cxx/
+*.apk
+*.aab
+
+# iOS
+ios/App/Pods/
+ios/App/build/
+*.ipa
+xcuserdata/
+*.xcworkspace
+DerivedData/
