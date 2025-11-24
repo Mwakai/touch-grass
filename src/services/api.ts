@@ -48,6 +48,34 @@ interface Kid {
   updatedAt?: string
 }
 
+interface KidResponse {
+  id?: string
+  _id?: string
+  name: string
+  age: number
+  avatarColor?: string
+  avatorColor?: string
+  interests: string[]
+  points?: number
+  stats?: {
+    challenges: number
+    badges: number
+    outdoorMinutes: number
+  }
+  createdAt?: string
+  updatedAt?: string
+}
+
+interface GetKidsResponse {
+  data?: KidResponse[]
+  kids?: KidResponse[]
+}
+
+interface GetKidResponse {
+  data?: KidResponse
+  kid?: KidResponse
+}
+
 class ApiClient {
   // Use ngrok URL for production/mobile, fallback to proxy for web dev
   private baseURL = import.meta.env.VITE_API_URL || 'https://fd112b3ec1da.ngrok-free.app/api'
@@ -64,21 +92,8 @@ class ApiClient {
       },
     }
 
-    console.log('API Request:', {
-      url: `${this.baseURL}${endpoint}`,
-      method: options.method || 'GET',
-      headers: config.headers,
-      body: options.body,
-    })
-
     try {
       const response = await fetch(`${this.baseURL}${endpoint}`, config)
-
-      console.log('API Response:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-      })
 
       if (!response.ok) {
         let errorData
@@ -100,7 +115,6 @@ class ApiClient {
       }
 
       const data = await response.json()
-      console.log('API Response Data:', data)
       return data
     } catch (error) {
       console.error('API Request Failed:', error)
@@ -137,7 +151,7 @@ class ApiClient {
 
   // Kids endpoints
   async addKid(kidData: KidData): Promise<Kid> {
-    const response = await this.request<any>('/kids', {
+    const response = await this.request<KidResponse>('/kids', {
       method: 'POST',
       body: JSON.stringify(kidData),
     })
@@ -145,8 +159,8 @@ class ApiClient {
     // Normalize the response with default values
     return {
       ...response,
-      id: response.id || response._id,
-      avatarColor: response.avatarColor,
+      id: response.id || response._id || '',
+      avatarColor: response.avatarColor || response.avatorColor || '',
       points: response.points ?? 0,
       stats: response.stats ?? {
         challenges: 0,
@@ -157,11 +171,11 @@ class ApiClient {
   }
 
   async getKids(): Promise<Kid[]> {
-    const response = await this.request<any>('/kids', {
+    const response = await this.request<KidResponse[] | GetKidsResponse>('/kids', {
       method: 'GET',
     })
 
-    let kidsArray: any[] = []
+    let kidsArray: KidResponse[] = []
 
     if (Array.isArray(response)) {
       kidsArray = response
@@ -177,8 +191,8 @@ class ApiClient {
     // Normalize kids data with default values
     return kidsArray.map((kid) => ({
       ...kid,
-      id: kid.id || kid._id, // Handle both 'id' and '_id' from backend
-      avatarColor: kid.avatarColor,
+      id: kid.id || kid._id || '', // Handle both 'id' and '_id' from backend
+      avatarColor: kid.avatarColor || kid.avatorColor || '',
       points: kid.points ?? 0,
       stats: kid.stats ?? {
         challenges: 0,
@@ -189,25 +203,23 @@ class ApiClient {
   }
 
   async getKid(kidId: string): Promise<Kid> {
-    const response = await this.request<any>(`/kids/${kidId}`, {
+    const response = await this.request<KidResponse | GetKidResponse>(`/kids/${kidId}`, {
       method: 'GET',
     })
 
-    console.log('getKid raw response:', response)
-
     // Handle different response formats from backend
-    let kid = response
-    if (response.data) {
+    let kid: KidResponse = response as KidResponse
+    if ('data' in response && response.data) {
       kid = response.data
-    } else if (response.kid) {
+    } else if ('kid' in response && response.kid) {
       kid = response.kid
     }
 
     // Normalize the response with default values
     return {
       ...kid,
-      id: kid.id || kid._id,
-      avatarColor: kid.avatarColor || kid.avatorColor,
+      id: kid.id || kid._id || '',
+      avatarColor: kid.avatarColor || kid.avatorColor || '',
       points: kid.points ?? 0,
       stats: kid.stats ?? {
         challenges: 0,

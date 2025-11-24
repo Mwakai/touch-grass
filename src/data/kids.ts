@@ -33,6 +33,7 @@ export type KidProfile = {
   age: number
   points: number
   avatarGradient: string
+  avatarColor?: string // Alias for avatarGradient for backward compatibility
   avatarAccent: string
   stats: KidStats
   quickStats: KidQuickStat[]

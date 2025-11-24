@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { api, type Kid } from '@/services/api'
+import { api } from '@/services/api'
 
 type Interest = {
   id: string
@@ -13,6 +13,13 @@ type ColorOption = {
   id: string
   label: string
   gradient: string
+}
+
+type OriginalKidData = {
+  name: string
+  age: number
+  avatarColor: string
+  interests: string[]
 }
 
 const router = useRouter()
@@ -46,9 +53,11 @@ const form = ref({
 const errors = ref<Record<string, string>>({})
 const isSubmitting = ref(false)
 const isLoading = ref(true)
-const originalKid = ref<any>(null)
+const originalKid = ref<OriginalKidData | null>(null)
 
-const avatarLetter = computed(() => (form.value.name ? form.value.name.charAt(0).toUpperCase() : 'K'))
+const avatarLetter = computed(() =>
+  form.value.name ? form.value.name.charAt(0).toUpperCase() : 'K',
+)
 
 const toggleInterest = (interestId: string) => {
   if (form.value.interests.includes(interestId)) {
@@ -74,11 +83,8 @@ const loadKidData = async () => {
   isLoading.value = true
   errors.value = {}
 
-  console.log('Loading kid with ID:', kidId)
-
   try {
     const kid = await api.getKid(kidId)
-    console.log('Loaded kid data:', kid)
 
     // Store original data for comparison
     originalKid.value = {
@@ -94,9 +100,9 @@ const loadKidData = async () => {
       color: kid.avatarColor || colorOptions[0]?.gradient || '',
       interests: kid.interests || [],
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to load kid:', error)
-    errors.value.load = error.message || 'Failed to load kid data'
+    errors.value.load = error instanceof Error ? error.message : 'Failed to load kid data'
   } finally {
     isLoading.value = false
   }
@@ -110,7 +116,7 @@ const handleSubmit = async () => {
 
   try {
     // Only send fields that have changed
-    const updates: Record<string, any> = {}
+    const updates: Partial<OriginalKidData> = {}
 
     const currentName = form.value.name?.trim() || ''
     const currentAge = parseInt(form.value.age) || 0
@@ -137,9 +143,10 @@ const handleSubmit = async () => {
 
     // Success - redirect to dashboard
     router.push({ name: 'dashboard' })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to update kid:', error)
-    errors.value.submit = error.message || 'Failed to update kid. Please try again.'
+    errors.value.submit =
+      error instanceof Error ? error.message : 'Failed to update kid. Please try again.'
   } finally {
     isSubmitting.value = false
   }
@@ -169,16 +176,16 @@ onMounted(() => {
       </button>
       <div>
         <p class="text-sm text-slate-500">Family</p>
-        <h1 class="text-2xl font-semibold text-slate-900">
-          Edit {{ form.name || 'Kid' }}
-        </h1>
+        <h1 class="text-2xl font-semibold text-slate-900">Edit {{ form.name || 'Kid' }}</h1>
       </div>
     </header>
 
     <main class="mx-auto max-w-3xl px-6">
       <div v-if="isLoading" class="flex items-center justify-center py-16">
         <div class="text-center">
-          <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-emerald-500 border-r-transparent"></div>
+          <div
+            class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-emerald-500 border-r-transparent"
+          ></div>
           <p class="mt-2 text-sm text-slate-500">Loading...</p>
         </div>
       </div>
@@ -277,7 +284,9 @@ onMounted(() => {
           </div>
 
           <div class="pt-4">
-            <p v-if="errors.submit" class="mb-3 text-center text-sm text-rose-500">{{ errors.submit }}</p>
+            <p v-if="errors.submit" class="mb-3 text-center text-sm text-rose-500">
+              {{ errors.submit }}
+            </p>
             <button
               type="submit"
               :disabled="isSubmitting"

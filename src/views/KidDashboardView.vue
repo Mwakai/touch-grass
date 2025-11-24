@@ -2,7 +2,26 @@
 import { computed, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { getKidById, mockKids, type KidChallenge } from '@/data/kids'
+import {
+  getKidById,
+  mockKids,
+  type KidChallenge,
+  type KidQuickStat,
+  type KidStats,
+} from '@/data/kids'
+
+interface KidData {
+  id: string
+  name: string
+  email?: string
+  age: number
+  avatarColor: string
+  points: number
+  stats: KidStats
+  quickStats: KidQuickStat[]
+  challenges: KidChallenge[]
+  badges: { id: string; name: string; emoji: string }[]
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -11,14 +30,17 @@ const authStore = useAuthStore()
 const kidId = computed(() => route.params.kidId as string | undefined)
 
 // Use logged-in user's data for the kid, or try to find in mock data
-const kid = computed(() => {
+const kid = computed((): KidData | undefined => {
   // If the logged-in user is a kid, use their data
   if (authStore.user?.role === 'kid') {
     // Try to get kid from mock data, or create from auth user
     const mockKid = kidId.value ? getKidById(kidId.value) : null
 
     if (mockKid) {
-      return mockKid
+      return {
+        ...mockKid,
+        avatarColor: mockKid.avatarColor || mockKid.avatarGradient,
+      }
     }
 
     // Create kid object from logged-in user
@@ -32,20 +54,27 @@ const kid = computed(() => {
       stats: {
         challenges: 0,
         badges: 0,
-        outdoorMinutes: 0
+        outdoorMinutes: 0,
       },
       quickStats: [
         { id: 'streak', label: 'Current Streak', value: '0 days', description: 'Keep going!' },
         { id: 'week', label: 'This Week', value: '0 pts', description: 'Points earned' },
-        { id: 'rank', label: 'Rank', value: 'Explorer', description: 'Current level' }
+        { id: 'rank', label: 'Rank', value: 'Explorer', description: 'Current level' },
       ],
       challenges: mockKids[0]?.challenges || [],
-      badges: []
+      badges: [],
     }
   }
 
   // Fallback to mock data
-  return kidId.value ? getKidById(kidId.value) : mockKids[0]
+  const fallbackKid = kidId.value ? getKidById(kidId.value) : mockKids[0]
+  if (fallbackKid) {
+    return {
+      ...fallbackKid,
+      avatarColor: fallbackKid.avatarColor || fallbackKid.avatarGradient,
+    }
+  }
+  return undefined
 })
 
 watchEffect(() => {
@@ -84,7 +113,6 @@ const challengeCardClasses = (challenge: KidChallenge) => {
 const handleLogout = async () => {
   try {
     await authStore.logout()
-    console.log('Logout successful, redirecting to login')
     await router.push('/login')
   } catch (error) {
     console.error('Logout error:', error)
@@ -109,7 +137,9 @@ const handleLogout = async () => {
     </header>
 
     <section class="px-6 pb-8 pt-6">
-      <div class="relative overflow-hidden rounded-[32px] bg-white/80 p-6 shadow-xl ring-1 ring-white/60 backdrop-blur">
+      <div
+        class="relative overflow-hidden rounded-[32px] bg-white/80 p-6 shadow-xl ring-1 ring-white/60 backdrop-blur"
+      >
         <div class="flex flex-col gap-6 md:flex-row md:items-center">
           <div
             class="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br text-4xl font-bold text-white shadow-lg"
@@ -122,7 +152,9 @@ const handleLogout = async () => {
             <h1 class="text-3xl font-bold text-slate-900">{{ kid.name }}</h1>
             <p class="text-sm text-slate-500">{{ humanDate }} · {{ humanTime }}</p>
           </div>
-          <div class="flex flex-col items-start gap-2 rounded-2xl bg-emerald-500/10 px-6 py-4 text-emerald-600">
+          <div
+            class="flex flex-col items-start gap-2 rounded-2xl bg-emerald-500/10 px-6 py-4 text-emerald-600"
+          >
             <div class="flex items-center gap-2 text-sm font-semibold">
               <span>⭐</span>
               Points
@@ -167,7 +199,10 @@ const handleLogout = async () => {
             </div>
             <div class="flex-1">
               <div class="flex items-center gap-2">
-                <h3 class="text-lg font-semibold" :class="challenge.status === 'locked' ? 'text-slate-400' : 'text-slate-900'">
+                <h3
+                  class="text-lg font-semibold"
+                  :class="challenge.status === 'locked' ? 'text-slate-400' : 'text-slate-900'"
+                >
                   {{ challenge.title }}
                 </h3>
                 <span
@@ -183,14 +218,22 @@ const handleLogout = async () => {
                   🔒 Locked
                 </span>
               </div>
-              <p class="mt-1 text-sm" :class="challenge.status === 'locked' ? 'text-slate-400' : 'text-slate-500'">
+              <p
+                class="mt-1 text-sm"
+                :class="challenge.status === 'locked' ? 'text-slate-400' : 'text-slate-500'"
+              >
                 {{ challenge.description }}
               </p>
               <div class="mt-3 flex flex-wrap items-center gap-3 text-sm">
-                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 font-semibold text-emerald-600">
+                <span
+                  class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 font-semibold text-emerald-600"
+                >
                   ⭐ {{ challenge.points }} pts
                 </span>
-                <span v-if="challenge.distance" class="inline-flex items-center gap-1 text-slate-500">
+                <span
+                  v-if="challenge.distance"
+                  class="inline-flex items-center gap-1 text-slate-500"
+                >
                   📍 {{ challenge.distance }}
                 </span>
               </div>

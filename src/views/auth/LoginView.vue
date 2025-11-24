@@ -1,8 +1,20 @@
-<script setup>
+<script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getDefaultRouteForUser } from '@/utils/authRedirect'
+
+interface User {
+  id: number | string
+  email: string
+  role: string
+  name?: string
+  familyCode?: string
+  parentId?: string
+  kidId?: string
+  age?: number
+  interests?: string[]
+}
 
 const router = useRouter()
 const route = useRoute()
@@ -12,15 +24,21 @@ const email = ref('')
 const password = ref('')
 const error = ref('')
 
-const validateEmail = (email) => {
+const validateEmail = (email: string): boolean => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return re.test(email)
 }
 
-const redirectAfterAuth = (maybeUser) => {
+const redirectAfterAuth = (maybeUser: User | null): void => {
   const target = getDefaultRouteForUser(maybeUser ?? authStore.user)
 
-  if (target.name === route.name && route.fullPath === router.resolve(target).fullPath) {
+  // Check if we're already on the target route
+  if (
+    typeof target === 'object' &&
+    'name' in target &&
+    target.name === route.name &&
+    route.fullPath === router.resolve(target).fullPath
+  ) {
     return
   }
 
@@ -46,7 +64,6 @@ const handleLogin = async () => {
     // Wait for Vue reactivity to complete, then redirect
     await nextTick()
     const target = getDefaultRouteForUser(authStore.user)
-    console.log('Redirecting after login to:', target)
     await router.push(target)
   } catch (e) {
     error.value = 'Invalid email or password'
@@ -56,12 +73,12 @@ const handleLogin = async () => {
 
 watch(
   () => (authStore.isAuthenticated ? authStore.user : null),
-  (maybeUser) => {
+  (maybeUser: User | null) => {
     if (maybeUser && route.name === 'login') {
       redirectAfterAuth(maybeUser)
     }
   },
-  { immediate: true }
+  { immediate: true },
 )
 
 const clearError = () => {
@@ -70,7 +87,9 @@ const clearError = () => {
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-400 to-blue-500 p-5">
+  <div
+    class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-400 to-blue-500 p-5"
+  >
     <!-- Logo and Title -->
     <div class="text-center mb-6">
       <div class="text-6xl mb-2">🌱</div>
@@ -84,9 +103,7 @@ const clearError = () => {
       <form @submit.prevent="handleLogin" class="space-y-4">
         <!-- Email Input -->
         <div>
-          <label for="email" class="block text-sm font-semibold text-gray-900 mb-2">
-            Email
-          </label>
+          <label for="email" class="block text-sm font-semibold text-gray-900 mb-2"> Email </label>
           <input
             id="email"
             v-model="email"
@@ -115,7 +132,10 @@ const clearError = () => {
         </div>
 
         <!-- Error Message -->
-        <div v-if="error" class="bg-red-50 border border-red-200 text-red-600 rounded-lg p-3 text-sm text-center">
+        <div
+          v-if="error"
+          class="bg-red-50 border border-red-200 text-red-600 rounded-lg p-3 text-sm text-center"
+        >
           {{ error }}
         </div>
 
@@ -132,7 +152,10 @@ const clearError = () => {
       <!-- Sign Up Link -->
       <div class="mt-6 text-center text-sm">
         <span class="text-gray-600">Don't have an account? </span>
-        <router-link to="/signup" class="text-primary font-semibold hover:text-emerald-600 transition-colors">
+        <router-link
+          to="/signup"
+          class="text-primary font-semibold hover:text-emerald-600 transition-colors"
+        >
           Sign up
         </router-link>
       </div>

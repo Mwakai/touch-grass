@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -11,19 +11,19 @@ const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const selectedRole = ref('')
-const name = ref('')          // For kid signup
-const familyCode = ref('')    // For kid signup
-const age = ref('')           // For kid signup
+const name = ref('') // For kid signup
+const familyCode = ref('') // For kid signup
+const age = ref('') // For kid signup
 const error = ref('')
 const signupSuccess = ref(false)
-const parentFamilyCode = ref('')  // To show after parent signup
+const parentFamilyCode = ref('') // To show after parent signup
 
-const validateEmail = (email) => {
+const validateEmail = (email: string): boolean => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return re.test(email)
 }
 
-const selectRole = (role) => {
+const selectRole = (role: string): void => {
   selectedRole.value = role
   clearError()
 }
@@ -81,23 +81,22 @@ const handleSignup = async () => {
       ...(selectedRole.value === 'kid' && {
         name: name.value.trim(),
         familyCode: familyCode.value.trim().toUpperCase(),
-        age: parseInt(age.value)
-      })
+        age: parseInt(age.value),
+      }),
     }
 
-    const result = await authStore.signup(signupData)
+    await authStore.signup(signupData)
 
     // If parent, show the family code before redirecting
     if (selectedRole.value === 'parent' && authStore.user?.familyCode) {
       parentFamilyCode.value = authStore.user.familyCode
       signupSuccess.value = true
-      return  // Don't redirect yet, show the family code
+      return // Don't redirect yet, show the family code
     }
 
     // Wait for Vue reactivity to complete, then redirect
     await nextTick()
     const target = getDefaultRouteForUser(authStore.user)
-    console.log('Redirecting after signup to:', target)
     await router.push(target)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Signup failed. Please try again.'
@@ -116,7 +115,9 @@ const clearError = () => {
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-400 to-blue-500 p-5">
+  <div
+    class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-400 to-blue-500 p-5"
+  >
     <!-- Logo and Title -->
     <div class="text-center mb-6">
       <div class="text-6xl mb-2">🌱</div>
@@ -124,11 +125,16 @@ const clearError = () => {
     </div>
 
     <!-- Success Card for Parent - Show Family Code -->
-    <div v-if="signupSuccess && parentFamilyCode" class="bg-white rounded-xl shadow-md p-6 w-full max-w-md">
+    <div
+      v-if="signupSuccess && parentFamilyCode"
+      class="bg-white rounded-xl shadow-md p-6 w-full max-w-md"
+    >
       <div class="text-center">
         <div class="text-6xl mb-4">🎉</div>
         <h2 class="text-2xl font-bold text-gray-900 mb-2">Account Created!</h2>
-        <p class="text-gray-600 mb-6">Share this family code with your kids so they can join your family:</p>
+        <p class="text-gray-600 mb-6">
+          Share this family code with your kids so they can join your family:
+        </p>
 
         <div class="bg-emerald-50 border-2 border-emerald-200 rounded-lg p-4 mb-6">
           <p class="text-sm text-emerald-600 font-medium mb-2">Your Family Code</p>
@@ -155,9 +161,7 @@ const clearError = () => {
       <form @submit.prevent="handleSignup" class="space-y-4">
         <!-- Role Selector -->
         <div>
-          <label class="block text-sm font-semibold text-gray-900 mb-3">
-            I am a...
-          </label>
+          <label class="block text-sm font-semibold text-gray-900 mb-3"> I am a... </label>
           <div class="grid grid-cols-2 gap-4">
             <!-- Parent Button -->
             <button
@@ -167,7 +171,7 @@ const clearError = () => {
                 'flex flex-col items-center justify-center p-6 border-2 rounded-lg transition-all min-h-[120px]',
                 selectedRole === 'parent'
                   ? 'border-primary bg-emerald-50'
-                  : 'border-gray-300 bg-white hover:border-gray-400'
+                  : 'border-gray-300 bg-white hover:border-gray-400',
               ]"
             >
               <span class="text-4xl mb-2">👨‍👩‍👧‍👦</span>
@@ -182,7 +186,7 @@ const clearError = () => {
                 'flex flex-col items-center justify-center p-6 border-2 rounded-lg transition-all min-h-[120px]',
                 selectedRole === 'kid'
                   ? 'border-primary bg-emerald-50'
-                  : 'border-gray-300 bg-white hover:border-gray-400'
+                  : 'border-gray-300 bg-white hover:border-gray-400',
               ]"
             >
               <span class="text-4xl mb-2">🧒</span>
@@ -248,9 +252,7 @@ const clearError = () => {
 
         <!-- Email Input -->
         <div>
-          <label for="email" class="block text-sm font-semibold text-gray-900 mb-2">
-            Email
-          </label>
+          <label for="email" class="block text-sm font-semibold text-gray-900 mb-2"> Email </label>
           <input
             id="email"
             v-model="email"
@@ -295,7 +297,10 @@ const clearError = () => {
         </div>
 
         <!-- Error Message -->
-        <div v-if="error" class="bg-red-50 border border-red-200 text-red-600 rounded-lg p-3 text-sm text-center">
+        <div
+          v-if="error"
+          class="bg-red-50 border border-red-200 text-red-600 rounded-lg p-3 text-sm text-center"
+        >
           {{ error }}
         </div>
 
@@ -312,7 +317,10 @@ const clearError = () => {
       <!-- Login Link -->
       <div class="mt-6 text-center text-sm">
         <span class="text-gray-600">Already have an account? </span>
-        <router-link to="/login" class="text-primary font-semibold hover:text-emerald-600 transition-colors">
+        <router-link
+          to="/login"
+          class="text-primary font-semibold hover:text-emerald-600 transition-colors"
+        >
           Login
         </router-link>
       </div>

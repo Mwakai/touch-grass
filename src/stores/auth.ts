@@ -14,10 +14,21 @@ interface User {
   interests?: string[]
 }
 
+interface NestedAuthData {
+  token?: string
+  [key: string]: unknown
+}
+
 interface AuthResponse {
   token?: string
-  data?: User
+  data?: User | NestedAuthData
   user?: User
+}
+
+interface GetMeResponse {
+  user?: User
+  data?: User
+  [key: string]: unknown
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -40,17 +51,21 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const response = (await api.login({ email, password })) as unknown as AuthResponse
 
-      console.log('Login response:', response)
-
-      // Handle different response structures
-      // Backend returns: {success: true, token: "...", data: {id, email, role, ...}}
       let authToken = response.token
-      let userData = response.data
+      let userData: User | undefined = undefined
 
-      // Fallback: check if token and user are nested in data
-      if (!authToken && response.data && 'token' in response.data) {
-        authToken = (response.data as any).token
+      // Check if data is a User or contains nested auth data
+      if (response.data) {
+        if ('token' in response.data && typeof response.data.token === 'string') {
+          // data contains nested token
+          authToken = authToken || response.data.token
+        } else {
+          // data is the user object
+          userData = response.data as User
+        }
       }
+
+      // Fallback: check if user is provided separately
       if (!userData && response.user) {
         userData = response.user
       }
@@ -60,8 +75,6 @@ export const useAuthStore = defineStore('auth', () => {
         throw new Error('Invalid response from server')
       }
 
-      console.log('Extracted auth data:', { token: authToken, user: userData })
-
       // Store token in localStorage
       localStorage.setItem('token', authToken)
       localStorage.setItem('user', JSON.stringify(userData))
@@ -69,12 +82,6 @@ export const useAuthStore = defineStore('auth', () => {
       // Update state
       token.value = authToken
       user.value = userData
-
-      console.log('Auth state updated:', {
-        user: user.value,
-        token: token.value,
-        isAuthenticated: isAuthenticated.value,
-      })
 
       return { token: authToken, user: userData }
     } catch (err) {
@@ -105,17 +112,23 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const response = (await api.signup(params)) as unknown as AuthResponse
 
-      console.log('Signup response:', response)
-
       // Handle different response structures
       // Backend returns: {success: true, token: "...", data: {id, email, role, ...}}
       let authToken = response.token
-      let userData = response.data
+      let userData: User | undefined = undefined
 
-      // Fallback: check if token and user are nested in data
-      if (!authToken && response.data && 'token' in response.data) {
-        authToken = (response.data as any).token
+      // Check if data is a User or contains nested auth data
+      if (response.data) {
+        if ('token' in response.data && typeof response.data.token === 'string') {
+          // data contains nested token
+          authToken = authToken || response.data.token
+        } else {
+          // data is the user object
+          userData = response.data as User
+        }
       }
+
+      // Fallback: check if user is provided separately
       if (!userData && response.user) {
         userData = response.user
       }
@@ -125,8 +138,6 @@ export const useAuthStore = defineStore('auth', () => {
         throw new Error('Invalid response from server')
       }
 
-      console.log('Extracted signup data:', { token: authToken, user: userData })
-
       // Store token and user in localStorage
       localStorage.setItem('token', authToken)
       localStorage.setItem('user', JSON.stringify(userData))
@@ -134,12 +145,6 @@ export const useAuthStore = defineStore('auth', () => {
       // Update state
       token.value = authToken
       user.value = userData
-
-      console.log('Signup auth state updated:', {
-        user: user.value,
-        token: token.value,
-        isAuthenticated: isAuthenticated.value,
-      })
 
       return { token: authToken, user: userData }
     } catch (err) {
@@ -176,16 +181,13 @@ export const useAuthStore = defineStore('auth', () => {
 
     loading.value = true
     try {
-      const response = await api.getMe()
-      console.log('fetchUser response:', response)
+      const response = (await api.getMe()) as unknown as GetMeResponse
 
       // Handle different response structures
-      const userData = response.user || (response as any).data || response
+      const userData = response.user || response.data || (response as unknown as User)
 
       user.value = userData as User
       localStorage.setItem('user', JSON.stringify(userData))
-
-      console.log('User data set:', userData)
     } catch (err) {
       console.error('Failed to fetch user:', err)
       // If token is invalid, clear auth state

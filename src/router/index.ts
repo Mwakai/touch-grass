@@ -53,50 +53,34 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
 
-  console.log('Navigation guard:', {
-    to: to.name,
-    from: from.name,
-    isAuthenticated: authStore.isAuthenticated,
-    user: authStore.user,
-    requiresAuth: to.meta?.requiresAuth,
-    requiresGuest: to.meta?.requiresGuest,
-    allowedRoles: to.meta?.allowedRoles
-  })
-
   const redirectTo = (target: ReturnType<typeof getDefaultRouteForUser>) => {
     const resolvedTarget = router.resolve(target)
 
     if (resolvedTarget.fullPath === to.fullPath) {
-      console.log('Already at target route, allowing navigation')
       next()
       return true
     }
 
-    console.log('Redirecting to:', target)
     next(target)
     return true
   }
 
   if (to.meta?.requiresAuth && !authStore.isAuthenticated) {
-    console.log('Route requires auth but user not authenticated, redirecting to login')
     next({ name: 'login', query: { redirect: to.fullPath } })
     return
   }
 
   if (to.meta?.requiresGuest && authStore.isAuthenticated) {
-    console.log('Route requires guest but user authenticated, redirecting to default route')
     redirectTo(getDefaultRouteForUser(authStore.user))
     return
   }
 
   const allowedRoles = to.meta?.allowedRoles
   if (allowedRoles && authStore.user && !allowedRoles.includes(authStore.user.role)) {
-    console.log('User role not allowed for this route, redirecting to default route')
     redirectTo(getDefaultRouteForUser(authStore.user))
     return
   }
 
-  console.log('Navigation allowed')
   next()
 })
 

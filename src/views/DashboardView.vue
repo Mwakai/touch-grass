@@ -4,6 +4,14 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { api, type Kid } from '@/services/api'
 
+interface NavItem {
+  id: string
+  label: string
+  icon: string
+  to: string | null
+  action: string | null
+}
+
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
@@ -14,7 +22,7 @@ const hasKids = computed(() => kids.value.length > 0)
 const isLoading = ref(true)
 const error = ref<string | null>(null)
 
-const bottomNavItems = [
+const bottomNavItems: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: '🏡', to: '/dashboard', action: null },
   { id: 'kids', label: 'Kids', icon: '🧒', to: '/dashboard', action: null },
   { id: 'add', label: 'Add Kid', icon: '➕', to: '/add-kid', action: null },
@@ -24,7 +32,6 @@ const bottomNavItems = [
 const handleLogout = async () => {
   try {
     await authStore.logout()
-    console.log('Logout successful, redirecting to login')
     await router.push('/login')
   } catch (error) {
     console.error('Logout error:', error)
@@ -38,9 +45,8 @@ const openAddKid = () => {
 }
 
 const openKid = (kid: Kid) => {
-  const kidId = kid.id || (kid as any)._id
-  if (kidId) {
-    router.push({ name: 'kid-dashboard', params: { kidId } })
+  if (kid.id) {
+    router.push({ name: 'kid-dashboard', params: { kidId: kid.id } })
   }
 }
 
@@ -48,7 +54,7 @@ const isActiveNav = (path: string) => {
   return route.path === path
 }
 
-const handleNavClick = (item: any) => {
+const handleNavClick = (item: NavItem) => {
   if (item.action === 'logout') {
     handleLogout()
   } else if (item.to) {
@@ -62,27 +68,22 @@ const fetchKids = async () => {
 
   try {
     kids.value = await api.getKids()
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to fetch kids:', err)
-    error.value = err.message || 'Failed to load kids'
+    error.value = err instanceof Error ? err.message : 'Failed to load kids'
   } finally {
     isLoading.value = false
   }
 }
 
 const handleEditKid = (kid: Kid) => {
-  console.log('Edit kid clicked:', kid)
-  console.log('Full kid object:', JSON.stringify(kid, null, 2))
-  const kidId = kid.id || (kid as any)._id
-
-  if (!kidId) {
+  if (!kid.id) {
     console.error('No kid ID found:', kid)
     alert('Cannot edit kid - missing ID')
     return
   }
 
-  console.log('Navigating to edit with kidId:', kidId)
-  router.push({ name: 'edit-kid', params: { kidId } })
+  router.push({ name: 'edit-kid', params: { kidId: kid.id } })
 }
 
 const handleDeleteKid = async (kidId: string, kidName: string) => {
@@ -94,9 +95,9 @@ const handleDeleteKid = async (kidId: string, kidName: string) => {
     await api.deleteKid(kidId)
     // Refresh the kids list
     await fetchKids()
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to delete kid:', err)
-    alert(err.message || 'Failed to delete kid')
+    alert(err instanceof Error ? err.message : 'Failed to delete kid')
   }
 }
 
@@ -169,14 +170,14 @@ onMounted(() => {
               ✏️
             </button>
             <button
-              @click.stop="handleDeleteKid(kid.id || (kid as any)._id, kid.name)"
+              @click.stop="handleDeleteKid(kid.id, kid.name)"
               class="flex h-8 w-8 items-center justify-center rounded-full bg-rose-100 text-rose-600 transition hover:bg-rose-200"
               title="Delete kid"
             >
               🗑️
             </button>
           </div>
-          <div class="flex items-center gap-4" @click="openKid(kid.id)">
+          <div class="flex items-center gap-4" @click="openKid(kid)">
             <div
               class="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br text-2xl font-bold text-white cursor-pointer"
               :class="kid.avatarColor"
@@ -190,7 +191,7 @@ onMounted(() => {
             </div>
           </div>
 
-          <div class="mt-6 grid grid-cols-3 gap-3 text-center text-sm" @click="openKid(kid.id)">
+          <div class="mt-6 grid grid-cols-3 gap-3 text-center text-sm" @click="openKid(kid)">
             <div class="rounded-2xl bg-emerald-50 px-2 py-3 cursor-pointer">
               <p class="text-xs uppercase tracking-wide text-emerald-600">Challenges</p>
               <p class="text-lg font-bold text-slate-900">{{ kid.stats?.challenges ?? 0 }}</p>

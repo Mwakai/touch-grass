@@ -86,9 +86,9 @@ const handleSubmit = async () => {
 
     // Success redirect to dashboard
     router.push({ name: 'dashboard' })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to add kid:', error)
-    errors.value.submit = error.message || 'Failed to add kid. Please try again.'
+    errors.value.submit = error instanceof Error ? error.message : 'Failed to add kid. Please try again.'
   } finally {
     isSubmitting.value = false
   }
