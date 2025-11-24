@@ -27,7 +27,7 @@ const kid = computed(() => {
       name: authStore.user.name || authStore.user.email?.split('@')[0] || 'Explorer',
       email: authStore.user.email,
       age: 10, // Default age, can be updated when you add it to backend
-      avatarGradient: 'from-blue-400 to-purple-500',
+      avatarColor: 'from-blue-400 to-purple-500',
       points: 0,
       stats: {
         challenges: 0,
@@ -113,7 +113,7 @@ const handleLogout = async () => {
         <div class="flex flex-col gap-6 md:flex-row md:items-center">
           <div
             class="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br text-4xl font-bold text-white shadow-lg"
-            :class="kid.avatarGradient"
+            :class="kid.avatarColor"
           >
             {{ kid.name.charAt(0) }}
           </div>

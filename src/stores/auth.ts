@@ -3,10 +3,15 @@ import { defineStore } from 'pinia'
 import { api } from '@/services/api'
 
 interface User {
-  id: number
+  id: number | string
   email: string
   role: string
   name?: string
+  familyCode?: string
+  parentId?: string
+  kidId?: string
+  age?: number
+  interests?: string[]
 }
 
 interface AuthResponse {
@@ -33,7 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      const response = await api.login({ email, password }) as unknown as AuthResponse
+      const response = (await api.login({ email, password })) as unknown as AuthResponse
 
       console.log('Login response:', response)
 
@@ -68,7 +73,7 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('Auth state updated:', {
         user: user.value,
         token: token.value,
-        isAuthenticated: isAuthenticated.value
+        isAuthenticated: isAuthenticated.value,
       })
 
       return { token: authToken, user: userData }
@@ -82,12 +87,23 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const signup = async (email: string, password: string, role: string) => {
+  interface SignupParams {
+    email: string
+    password: string
+    role: string
+    familyCode?: string
+    name?: string
+    age?: number
+    interests?: string[]
+    avatarColor?: string
+  }
+
+  const signup = async (params: SignupParams) => {
     loading.value = true
     error.value = null
 
     try {
-      const response = await api.signup({ email, password, role }) as unknown as AuthResponse
+      const response = (await api.signup(params)) as unknown as AuthResponse
 
       console.log('Signup response:', response)
 
@@ -122,7 +138,7 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('Signup auth state updated:', {
         user: user.value,
         token: token.value,
-        isAuthenticated: isAuthenticated.value
+        isAuthenticated: isAuthenticated.value,
       })
 
       return { token: authToken, user: userData }
@@ -227,6 +243,6 @@ export const useAuthStore = defineStore('auth', () => {
     signup,
     logout,
     fetchUser,
-    initAuth
+    initAuth,
   }
 })

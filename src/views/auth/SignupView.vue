@@ -11,7 +11,12 @@ const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const selectedRole = ref('')
+const name = ref('')          // For kid signup
+const familyCode = ref('')    // For kid signup
+const age = ref('')           // For kid signup
 const error = ref('')
+const signupSuccess = ref(false)
+const parentFamilyCode = ref('')  // To show after parent signup
 
 const validateEmail = (email) => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -37,6 +42,22 @@ const handleSignup = async () => {
     return
   }
 
+  // Kid-specific validation
+  if (selectedRole.value === 'kid') {
+    if (!name.value.trim()) {
+      error.value = 'Please enter your name'
+      return
+    }
+    if (!familyCode.value.trim()) {
+      error.value = 'Please enter the family code from your parent'
+      return
+    }
+    if (!age.value || parseInt(age.value) < 1 || parseInt(age.value) > 18) {
+      error.value = 'Please enter a valid age (1-18)'
+      return
+    }
+  }
+
   if (!validateEmail(email.value)) {
     error.value = 'Please enter a valid email address'
     return
@@ -53,16 +74,40 @@ const handleSignup = async () => {
   }
 
   try {
-    await authStore.signup(email.value, password.value, selectedRole.value)
+    const signupData = {
+      email: email.value,
+      password: password.value,
+      role: selectedRole.value,
+      ...(selectedRole.value === 'kid' && {
+        name: name.value.trim(),
+        familyCode: familyCode.value.trim().toUpperCase(),
+        age: parseInt(age.value)
+      })
+    }
+
+    const result = await authStore.signup(signupData)
+
+    // If parent, show the family code before redirecting
+    if (selectedRole.value === 'parent' && authStore.user?.familyCode) {
+      parentFamilyCode.value = authStore.user.familyCode
+      signupSuccess.value = true
+      return  // Don't redirect yet, show the family code
+    }
+
     // Wait for Vue reactivity to complete, then redirect
     await nextTick()
     const target = getDefaultRouteForUser(authStore.user)
     console.log('Redirecting after signup to:', target)
     await router.push(target)
   } catch (e) {
-    error.value = 'Signup failed. Please try again.'
+    error.value = e instanceof Error ? e.message : 'Signup failed. Please try again.'
     console.error('Signup error:', e)
   }
+}
+
+const continueToApp = async () => {
+  const target = getDefaultRouteForUser(authStore.user)
+  await router.push(target)
 }
 
 const clearError = () => {
@@ -78,8 +123,33 @@ const clearError = () => {
       <h1 class="text-4xl font-bold text-white">Touch Grass</h1>
     </div>
 
+    <!-- Success Card for Parent - Show Family Code -->
+    <div v-if="signupSuccess && parentFamilyCode" class="bg-white rounded-xl shadow-md p-6 w-full max-w-md">
+      <div class="text-center">
+        <div class="text-6xl mb-4">🎉</div>
+        <h2 class="text-2xl font-bold text-gray-900 mb-2">Account Created!</h2>
+        <p class="text-gray-600 mb-6">Share this family code with your kids so they can join your family:</p>
+
+        <div class="bg-emerald-50 border-2 border-emerald-200 rounded-lg p-4 mb-6">
+          <p class="text-sm text-emerald-600 font-medium mb-2">Your Family Code</p>
+          <p class="text-3xl font-bold text-emerald-700 tracking-widest">{{ parentFamilyCode }}</p>
+        </div>
+
+        <p class="text-sm text-gray-500 mb-6">
+          Kids will need this code when they sign up to link to your family.
+        </p>
+
+        <button
+          @click="continueToApp"
+          class="w-full bg-primary hover:bg-emerald-600 text-white font-semibold px-4 py-2 rounded-lg transition-all min-h-[44px]"
+        >
+          Continue to Dashboard
+        </button>
+      </div>
+    </div>
+
     <!-- Signup Card -->
-    <div class="bg-white rounded-xl shadow-md p-6 w-full max-w-md">
+    <div v-else class="bg-white rounded-xl shadow-md p-6 w-full max-w-md">
       <h2 class="text-2xl font-bold text-gray-900 mb-6 text-center">Create Account</h2>
 
       <form @submit.prevent="handleSignup" class="space-y-4">
@@ -120,6 +190,61 @@ const clearError = () => {
             </button>
           </div>
         </div>
+
+        <!-- Kid-specific fields -->
+        <template v-if="selectedRole === 'kid'">
+          <!-- Name Input -->
+          <div>
+            <label for="name" class="block text-sm font-semibold text-gray-900 mb-2">
+              Your Name
+            </label>
+            <input
+              id="name"
+              v-model="name"
+              type="text"
+              placeholder="What should we call you?"
+              @input="clearError"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-20 transition-all"
+              :disabled="authStore.loading"
+            />
+          </div>
+
+          <!-- Age Input -->
+          <div>
+            <label for="age" class="block text-sm font-semibold text-gray-900 mb-2">
+              Your Age
+            </label>
+            <input
+              id="age"
+              v-model="age"
+              type="number"
+              min="1"
+              max="18"
+              placeholder="How old are you?"
+              @input="clearError"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-20 transition-all"
+              :disabled="authStore.loading"
+            />
+          </div>
+
+          <!-- Family Code Input -->
+          <div>
+            <label for="familyCode" class="block text-sm font-semibold text-gray-900 mb-2">
+              Family Code
+            </label>
+            <input
+              id="familyCode"
+              v-model="familyCode"
+              type="text"
+              placeholder="Enter code from your parent"
+              @input="clearError"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-20 transition-all uppercase tracking-widest text-center font-mono"
+              :disabled="authStore.loading"
+              maxlength="10"
+            />
+            <p class="text-xs text-gray-500 mt-1">Ask your parent for this code</p>
+          </div>
+        </template>
 
         <!-- Email Input -->
         <div>

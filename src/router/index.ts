@@ -34,6 +34,12 @@ const router = createRouter({
       meta: { requiresAuth: true, allowedRoles: ['parent'] },
     },
     {
+      path: '/edit-kid/:kidId',
+      name: 'edit-kid',
+      component: () => import('@/views/EditKidView.vue'),
+      meta: { requiresAuth: true, allowedRoles: ['parent'] },
+    },
+    {
       path: '/kids/:kidId?',
       name: 'kid-dashboard',
       component: () => import('@/views/KidDashboardView.vue'),
