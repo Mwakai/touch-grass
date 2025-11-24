@@ -46,3 +46,139 @@ npm run build
 ```sh
 npm run lint
 ```
+
+### Run Tests with [Vitest](https://vitest.dev/)
+
+```sh
+# Run tests in watch mode
+npm run test
+
+# Run tests once
+npm run test:run
+
+# Run tests with UI
+npm run test:ui
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+## CI/CD Pipelines
+
+This project includes comprehensive CI/CD pipelines using GitHub Actions for automated testing, building, and deployment.
+
+### Available Workflows
+
+#### 1. CI Workflow (`.github/workflows/ci.yml`)
+
+Runs on every push and pull request to `main` branch.
+
+**Steps:**
+- Linting with ESLint
+- Type checking with TypeScript
+- Unit tests with Vitest
+- Production build
+
+**Triggers:** Push to `main`, Pull requests to `main`
+
+#### 2. Vercel Deployment (`.github/workflows/deploy-vercel.yml`)
+
+Automatically deploys the web application to Vercel.
+
+**Steps:**
+- Builds the application
+- Deploys to Vercel (production for `main`, preview for PRs)
+- Comments deployment URL on pull requests
+
+**Required Secrets:**
+- `VERCEL_TOKEN` - Get from [Vercel Settings](https://vercel.com/account/tokens)
+- `VERCEL_ORG_ID` - Run `vercel link` locally to get this value from `.vercel/project.json`
+- `VERCEL_PROJECT_ID` - Run `vercel link` locally to get this value from `.vercel/project.json`
+
+**Setup Instructions:**
+```sh
+# Install Vercel CLI
+npm i -g vercel
+
+# Link your project
+vercel link
+
+# Copy the values from .vercel/project.json to GitHub Secrets
+```
+
+**Triggers:** Push to `main`, Pull requests to `main`
+
+#### 3. Android Build (`.github/workflows/build-android.yml`)
+
+Builds Android APK (debug) and AAB (release) files.
+
+**Steps:**
+- Builds web assets
+- Syncs Capacitor
+- Builds Android app using Gradle
+- Uploads build artifacts
+
+**Required Secrets (for release builds):**
+- `ANDROID_KEYSTORE_PASSWORD` - Keystore password
+- `ANDROID_KEY_ALIAS` - Key alias
+- `ANDROID_KEY_PASSWORD` - Key password
+
+**Triggers:**
+- Push to `main` (builds debug APK)
+- Tags starting with `v*` (builds release AAB)
+- Pull requests (builds debug APK)
+- Manual workflow dispatch
+
+#### 4. iOS Build (`.github/workflows/build-ios.yml`)
+
+Builds iOS application for simulator (debug) and device (release).
+
+**Steps:**
+- Builds web assets
+- Syncs Capacitor
+- Installs CocoaPods dependencies
+- Builds iOS app using Xcode
+- Exports IPA (for release builds)
+
+**Required Secrets (for release builds):**
+- `MATCH_PASSWORD` - Fastlane Match password (if using Match for code signing)
+- `FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD` - Apple app-specific password
+
+**Triggers:**
+- Push to `main` (builds for simulator)
+- Tags starting with `v*` (builds release IPA)
+- Pull requests (builds for simulator)
+- Manual workflow dispatch
+
+### Setting Up GitHub Secrets
+
+Navigate to your repository on GitHub, then:
+
+1. Go to **Settings** > **Secrets and variables** > **Actions**
+2. Click **New repository secret**
+3. Add each required secret mentioned above
+
+### Release Process
+
+To create a release build for mobile apps:
+
+```sh
+# Tag your release
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This will trigger release builds for both Android (AAB) and iOS (IPA).
+
+### Local Mobile Development
+
+```sh
+# Sync web assets with mobile projects
+npx cap sync
+
+# Open in Android Studio
+npx cap open android
+
+# Open in Xcode
+npx cap open ios
+```
