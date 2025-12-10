@@ -44,7 +44,7 @@ const router = createRouter({
       name: 'kid-dashboard',
       component: () => import('@/views/KidDashboardView.vue'),
       props: true,
-      meta: { requiresAuth: true, allowedRoles: ['kid'] },
+      meta: { requiresAuth: true, allowedRoles: ['kid', 'parent'] },
     },
   ],
 })
