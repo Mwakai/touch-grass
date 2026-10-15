@@ -1,29 +1,42 @@
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
+import { Check, Copy, User, Users } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { getDefaultRouteForUser } from '@/utils/authRedirect'
+import AuthLayout from '@/components/layout/AuthLayout.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppField from '@/components/ui/AppField.vue'
+
+type Role = 'parent' | 'kid'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
+const roles = [
+  { id: 'parent', label: 'Parent', description: 'Set up your family', icon: Users },
+  { id: 'kid', label: 'Kid', description: 'Join with a family code', icon: User },
+] as const
+
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
-const selectedRole = ref('')
+const selectedRole = ref<Role | ''>('')
 const name = ref('') // For kid signup
 const familyCode = ref('') // For kid signup
 const age = ref('') // For kid signup
 const error = ref('')
 const signupSuccess = ref(false)
 const parentFamilyCode = ref('') // To show after parent signup
+const copied = ref(false)
+const isContinuing = ref(false)
 
 const validateEmail = (email: string): boolean => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return re.test(email)
 }
 
-const selectRole = (role: string): void => {
+const selectRole = (role: Role): void => {
   selectedRole.value = role
   clearError()
 }
@@ -31,45 +44,45 @@ const selectRole = (role: string): void => {
 const handleSignup = async () => {
   error.value = ''
 
-  // Validation
   if (!selectedRole.value) {
-    error.value = 'Please select a role (Parent or Kid)'
-    return
-  }
-
-  if (!email.value || !password.value || !confirmPassword.value) {
-    error.value = 'Please fill in all fields'
+    error.value = 'Choose whether you are a parent or a kid'
     return
   }
 
   // Kid-specific validation
   if (selectedRole.value === 'kid') {
     if (!name.value.trim()) {
-      error.value = 'Please enter your name'
+      error.value = 'Enter your name'
+      return
+    }
+    const parsedAge = Number.parseInt(age.value, 10)
+    if (!parsedAge || parsedAge < 1 || parsedAge > 18) {
+      error.value = 'Enter an age between 1 and 18'
       return
     }
     if (!familyCode.value.trim()) {
-      error.value = 'Please enter the family code from your parent'
-      return
-    }
-    if (!age.value || parseInt(age.value) < 1 || parseInt(age.value) > 18) {
-      error.value = 'Please enter a valid age (1-18)'
+      error.value = 'Enter the family code from your parent'
       return
     }
   }
 
+  if (!email.value || !password.value || !confirmPassword.value) {
+    error.value = 'Fill in your email and both password fields'
+    return
+  }
+
   if (!validateEmail(email.value)) {
-    error.value = 'Please enter a valid email address'
+    error.value = 'Enter a valid email address'
     return
   }
 
   if (password.value.length < 6) {
-    error.value = 'Password must be at least 6 characters long'
+    error.value = 'Use at least 6 characters for your password'
     return
   }
 
   if (password.value !== confirmPassword.value) {
-    error.value = 'Passwords do not match'
+    error.value = 'The passwords don’t match'
     return
   }
 
@@ -81,32 +94,42 @@ const handleSignup = async () => {
       ...(selectedRole.value === 'kid' && {
         name: name.value.trim(),
         familyCode: familyCode.value.trim().toUpperCase(),
-        age: parseInt(age.value),
+        age: Number.parseInt(age.value, 10),
       }),
     }
 
     await authStore.signup(signupData)
 
-    // If parent, show the family code before redirecting
+    // Parents see their family code before continuing
     if (selectedRole.value === 'parent' && authStore.user?.familyCode) {
       parentFamilyCode.value = authStore.user.familyCode
       signupSuccess.value = true
-      return // Don't redirect yet, show the family code
+      return
     }
 
     // Wait for Vue reactivity to complete, then redirect
     await nextTick()
-    const target = getDefaultRouteForUser(authStore.user)
-    await router.push(target)
+    await router.push(getDefaultRouteForUser(authStore.user))
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Signup failed. Please try again.'
+    error.value =
+      e instanceof Error ? e.message : 'Could not create your account. Please try again.'
     console.error('Signup error:', e)
   }
 }
 
+const copyFamilyCode = async () => {
+  try {
+    await navigator.clipboard.writeText(parentFamilyCode.value)
+    copied.value = true
+    setTimeout(() => (copied.value = false), 2000)
+  } catch (e) {
+    console.error('Copy failed:', e)
+  }
+}
+
 const continueToApp = async () => {
-  const target = getDefaultRouteForUser(authStore.user)
-  await router.push(target)
+  isContinuing.value = true
+  await router.push(getDefaultRouteForUser(authStore.user))
 }
 
 const clearError = () => {
@@ -115,215 +138,159 @@ const clearError = () => {
 </script>
 
 <template>
-  <div
-    class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-400 to-blue-500 p-5"
-  >
-    <!-- Logo and Title -->
-    <div class="text-center mb-6">
-      <div class="text-6xl mb-2">🌱</div>
-      <h1 class="text-4xl font-bold text-white">Touch Grass</h1>
-    </div>
+  <AuthLayout>
+    <!-- Parent signup succeeded: show the family code -->
+    <div v-if="signupSuccess && parentFamilyCode" class="animate-enter">
+      <span
+        class="flex size-11 items-center justify-center rounded-full bg-grass-50 text-grass-600"
+      >
+        <Check :size="20" aria-hidden="true" />
+      </span>
+      <h1 class="mt-4 text-xl font-semibold text-ink-900">Account created</h1>
+      <p class="mt-1 text-base text-ink-500">
+        Your kids enter this code when they sign up, which links them to your family.
+      </p>
 
-    <!-- Success Card for Parent - Show Family Code -->
-    <div
-      v-if="signupSuccess && parentFamilyCode"
-      class="bg-white rounded-xl shadow-md p-6 w-full max-w-md"
-    >
-      <div class="text-center">
-        <div class="text-6xl mb-4">🎉</div>
-        <h2 class="text-2xl font-bold text-gray-900 mb-2">Account Created!</h2>
-        <p class="text-gray-600 mb-6">
-          Share this family code with your kids so they can join your family:
-        </p>
-
-        <div class="bg-emerald-50 border-2 border-emerald-200 rounded-lg p-4 mb-6">
-          <p class="text-sm text-emerald-600 font-medium mb-2">Your Family Code</p>
-          <p class="text-3xl font-bold text-emerald-700 tracking-widest">{{ parentFamilyCode }}</p>
-        </div>
-
-        <p class="text-sm text-gray-500 mb-6">
-          Kids will need this code when they sign up to link to your family.
-        </p>
-
-        <button
-          @click="continueToApp"
-          class="w-full bg-primary hover:bg-emerald-600 text-white font-semibold px-4 py-2 rounded-lg transition-all min-h-[44px]"
-        >
-          Continue to Dashboard
-        </button>
-      </div>
-    </div>
-
-    <!-- Signup Card -->
-    <div v-else class="bg-white rounded-xl shadow-md p-6 w-full max-w-md">
-      <h2 class="text-2xl font-bold text-gray-900 mb-6 text-center">Create Account</h2>
-
-      <form @submit.prevent="handleSignup" class="space-y-4">
-        <!-- Role Selector -->
+      <div class="mt-6 flex items-center justify-between gap-4 rounded-md bg-ink-50 p-4">
         <div>
-          <label class="block text-sm font-semibold text-gray-900 mb-3"> I am a... </label>
-          <div class="grid grid-cols-2 gap-4">
-            <!-- Parent Button -->
-            <button
-              type="button"
-              @click="selectRole('parent')"
-              :class="[
-                'flex flex-col items-center justify-center p-6 border-2 rounded-lg transition-all min-h-[120px]',
-                selectedRole === 'parent'
-                  ? 'border-primary bg-emerald-50'
-                  : 'border-gray-300 bg-white hover:border-gray-400',
-              ]"
-            >
-              <span class="text-4xl mb-2">👨‍👩‍👧‍👦</span>
-              <span class="font-semibold text-gray-900">Parent</span>
-            </button>
-
-            <!-- Kid Button -->
-            <button
-              type="button"
-              @click="selectRole('kid')"
-              :class="[
-                'flex flex-col items-center justify-center p-6 border-2 rounded-lg transition-all min-h-[120px]',
-                selectedRole === 'kid'
-                  ? 'border-primary bg-emerald-50'
-                  : 'border-gray-300 bg-white hover:border-gray-400',
-              ]"
-            >
-              <span class="text-4xl mb-2">🧒</span>
-              <span class="font-semibold text-gray-900">Kid</span>
-            </button>
-          </div>
+          <p class="text-xs font-medium text-ink-500">Family code</p>
+          <p class="mt-1 font-mono text-xl font-semibold tracking-widest text-ink-900">
+            {{ parentFamilyCode }}
+          </p>
         </div>
+        <AppButton
+          variant="secondary"
+          size="sm"
+          :icon="copied ? Check : Copy"
+          @click="copyFamilyCode"
+        >
+          {{ copied ? 'Copied' : 'Copy' }}
+        </AppButton>
+      </div>
 
-        <!-- Kid-specific fields -->
+      <AppButton class="mt-6" block :loading="isContinuing" @click="continueToApp">
+        Continue to dashboard
+      </AppButton>
+    </div>
+
+    <template v-else>
+      <h1 class="text-xl font-semibold text-ink-900">Create an account</h1>
+      <p class="mt-1 text-base text-ink-500">Parents set up the family first, then kids join.</p>
+
+      <form class="mt-6 space-y-4" novalidate @submit.prevent="handleSignup">
+        <fieldset>
+          <legend class="mb-2 text-sm font-medium text-ink-700">I am a</legend>
+          <div class="grid grid-cols-2 gap-3" role="radiogroup">
+            <button
+              v-for="role in roles"
+              :key="role.id"
+              type="button"
+              role="radio"
+              :aria-checked="selectedRole === role.id"
+              :disabled="authStore.loading"
+              class="flex flex-col items-start gap-2 rounded-md border p-4 text-left transition-colors"
+              :class="
+                selectedRole === role.id
+                  ? 'border-grass-600 bg-grass-50'
+                  : 'border-ink-200 bg-white hover:border-ink-300'
+              "
+              @click="selectRole(role.id)"
+            >
+              <component
+                :is="role.icon"
+                :size="20"
+                :class="selectedRole === role.id ? 'text-grass-600' : 'text-ink-500'"
+                aria-hidden="true"
+              />
+              <span>
+                <span class="block text-base font-semibold text-ink-900">{{ role.label }}</span>
+                <span class="block text-sm text-ink-500">{{ role.description }}</span>
+              </span>
+            </button>
+          </div>
+        </fieldset>
+
         <template v-if="selectedRole === 'kid'">
-          <!-- Name Input -->
-          <div>
-            <label for="name" class="block text-sm font-semibold text-gray-900 mb-2">
-              Your Name
-            </label>
-            <input
-              id="name"
+          <div class="grid gap-4 sm:grid-cols-[1fr_6rem]">
+            <AppField
               v-model="name"
-              type="text"
-              placeholder="What should we call you?"
-              @input="clearError"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-20 transition-all"
+              label="Your name"
+              autocomplete="given-name"
               :disabled="authStore.loading"
+              @update:model-value="clearError"
             />
-          </div>
-
-          <!-- Age Input -->
-          <div>
-            <label for="age" class="block text-sm font-semibold text-gray-900 mb-2">
-              Your Age
-            </label>
-            <input
-              id="age"
+            <AppField
               v-model="age"
+              label="Age"
               type="number"
-              min="1"
-              max="18"
-              placeholder="How old are you?"
-              @input="clearError"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-20 transition-all"
+              inputmode="numeric"
+              :min="1"
+              :max="18"
               :disabled="authStore.loading"
+              @update:model-value="clearError"
             />
           </div>
-
-          <!-- Family Code Input -->
-          <div>
-            <label for="familyCode" class="block text-sm font-semibold text-gray-900 mb-2">
-              Family Code
-            </label>
-            <input
-              id="familyCode"
-              v-model="familyCode"
-              type="text"
-              placeholder="Enter code from your parent"
-              @input="clearError"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-20 transition-all uppercase tracking-widest text-center font-mono"
-              :disabled="authStore.loading"
-              maxlength="10"
-            />
-            <p class="text-xs text-gray-500 mt-1">Ask your parent for this code</p>
-          </div>
+          <AppField
+            v-model="familyCode"
+            label="Family code"
+            hint="Your parent can find this on their account."
+            autocomplete="off"
+            :maxlength="10"
+            input-class="font-mono uppercase tracking-widest"
+            :disabled="authStore.loading"
+            @update:model-value="clearError"
+          />
         </template>
 
-        <!-- Email Input -->
-        <div>
-          <label for="email" class="block text-sm font-semibold text-gray-900 mb-2"> Email </label>
-          <input
-            id="email"
-            v-model="email"
-            type="email"
-            placeholder="Enter your email"
-            @input="clearError"
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-20 transition-all"
-            :disabled="authStore.loading"
-          />
-        </div>
+        <AppField
+          v-model="email"
+          label="Email"
+          type="email"
+          autocomplete="email"
+          inputmode="email"
+          :disabled="authStore.loading"
+          @update:model-value="clearError"
+        />
+        <AppField
+          v-model="password"
+          label="Password"
+          type="password"
+          autocomplete="new-password"
+          hint="At least 6 characters"
+          :disabled="authStore.loading"
+          @update:model-value="clearError"
+        />
+        <AppField
+          v-model="confirmPassword"
+          label="Confirm password"
+          type="password"
+          autocomplete="new-password"
+          :disabled="authStore.loading"
+          @update:model-value="clearError"
+        />
 
-        <!-- Password Input -->
-        <div>
-          <label for="password" class="block text-sm font-semibold text-gray-900 mb-2">
-            Password
-          </label>
-          <input
-            id="password"
-            v-model="password"
-            type="password"
-            placeholder="At least 6 characters"
-            @input="clearError"
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-20 transition-all"
-            :disabled="authStore.loading"
-          />
-        </div>
-
-        <!-- Confirm Password Input -->
-        <div>
-          <label for="confirmPassword" class="block text-sm font-semibold text-gray-900 mb-2">
-            Confirm Password
-          </label>
-          <input
-            id="confirmPassword"
-            v-model="confirmPassword"
-            type="password"
-            placeholder="Re-enter your password"
-            @input="clearError"
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-20 transition-all"
-            :disabled="authStore.loading"
-          />
-        </div>
-
-        <!-- Error Message -->
-        <div
+        <p
           v-if="error"
-          class="bg-red-50 border border-red-200 text-red-600 rounded-lg p-3 text-sm text-center"
+          role="alert"
+          class="rounded-md border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700"
         >
           {{ error }}
-        </div>
+        </p>
 
-        <!-- Sign Up Button -->
-        <button
-          type="submit"
-          :disabled="authStore.loading"
-          class="w-full bg-primary hover:bg-emerald-600 text-white font-semibold px-4 py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
-        >
-          {{ authStore.loading ? 'Creating account...' : 'Sign Up' }}
-        </button>
+        <AppButton type="submit" block :loading="authStore.loading">
+          {{ authStore.loading ? 'Creating account' : 'Create account' }}
+        </AppButton>
       </form>
+    </template>
 
-      <!-- Login Link -->
-      <div class="mt-6 text-center text-sm">
-        <span class="text-gray-600">Already have an account? </span>
-        <router-link
-          to="/login"
-          class="text-primary font-semibold hover:text-emerald-600 transition-colors"
-        >
-          Login
-        </router-link>
-      </div>
-    </div>
-  </div>
+    <template v-if="!signupSuccess" #footer>
+      Already have an account?
+      <RouterLink
+        to="/login"
+        class="font-semibold text-grass-700 transition-colors hover:text-grass-600"
+      >
+        Log in
+      </RouterLink>
+    </template>
+  </AuthLayout>
 </template>

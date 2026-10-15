@@ -1,66 +1,25 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { Clock, Medal, Pencil, Plus, Trash2, Trophy, Users } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { api, type Kid } from '@/services/api'
+import AppPage from '@/components/layout/AppPage.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import ErrorState from '@/components/ui/ErrorState.vue'
+import KidAvatar from '@/components/ui/KidAvatar.vue'
+import SkeletonBlock from '@/components/ui/SkeletonBlock.vue'
 
-interface NavItem {
-  id: string
-  label: string
-  icon: string
-  to: string | null
-  action: string | null
-}
-
-const router = useRouter()
-const route = useRoute()
 const authStore = useAuthStore()
 
-const parentName = computed(() => authStore.user?.name ?? 'Parent')
+const title = computed(() => (authStore.user?.name ? `Hi, ${authStore.user.name}` : 'Your family'))
 const kids = ref<Kid[]>([])
-const hasKids = computed(() => kids.value.length > 0)
 const isLoading = ref(true)
 const error = ref<string | null>(null)
 
-const bottomNavItems: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: '🏡', to: '/dashboard', action: null },
-  { id: 'kids', label: 'Kids', icon: '🧒', to: '/dashboard', action: null },
-  { id: 'add', label: 'Add Kid', icon: '➕', to: '/add-kid', action: null },
-  { id: 'logout', label: 'Logout', icon: '🚪', to: null, action: 'logout' },
-]
-
-const handleLogout = async () => {
-  try {
-    await authStore.logout()
-    await router.push('/login')
-  } catch (error) {
-    console.error('Logout error:', error)
-    // Still redirect to login even if logout fails
-    await router.push('/login')
-  }
-}
-
-const openAddKid = () => {
-  router.push({ name: 'add-kid' })
-}
-
-const openKid = (kid: Kid) => {
-  if (kid.id) {
-    router.push({ name: 'kid-dashboard', params: { kidId: kid.id } })
-  }
-}
-
-const isActiveNav = (path: string) => {
-  return route.path === path
-}
-
-const handleNavClick = (item: NavItem) => {
-  if (item.action === 'logout') {
-    handleLogout()
-  } else if (item.to) {
-    router.push(item.to)
-  }
-}
+const kidPendingDelete = ref<Kid | null>(null)
+const isDeleting = ref(false)
+const deleteError = ref<string | null>(null)
 
 const fetchKids = async () => {
   isLoading.value = true
@@ -70,180 +29,160 @@ const fetchKids = async () => {
     kids.value = await api.getKids()
   } catch (err: unknown) {
     console.error('Failed to fetch kids:', err)
-    error.value = err instanceof Error ? err.message : 'Failed to load kids'
+    error.value = err instanceof Error ? err.message : 'Could not load your kids.'
   } finally {
     isLoading.value = false
   }
 }
 
-const handleEditKid = (kid: Kid) => {
-  if (!kid.id) {
-    console.error('No kid ID found:', kid)
-    alert('Cannot edit kid - missing ID')
-    return
-  }
-
-  router.push({ name: 'edit-kid', params: { kidId: kid.id } })
+const requestDelete = (kid: Kid) => {
+  deleteError.value = null
+  kidPendingDelete.value = kid
 }
 
-const handleDeleteKid = async (kidId: string, kidName: string) => {
-  if (!confirm(`Are you sure you want to delete ${kidName}? This action cannot be undone.`)) {
-    return
-  }
+const confirmDelete = async () => {
+  const kid = kidPendingDelete.value
+  if (!kid) return
+
+  isDeleting.value = true
+  deleteError.value = null
 
   try {
-    await api.deleteKid(kidId)
-    // Refresh the kids list
-    await fetchKids()
+    await api.deleteKid(kid.id)
+    kids.value = kids.value.filter((k) => k.id !== kid.id)
+    kidPendingDelete.value = null
   } catch (err: unknown) {
     console.error('Failed to delete kid:', err)
-    alert(err instanceof Error ? err.message : 'Failed to delete kid')
+    deleteError.value = err instanceof Error ? err.message : 'Could not remove this kid.'
+  } finally {
+    isDeleting.value = false
   }
 }
 
-onMounted(() => {
-  fetchKids()
-})
+const statsFor = (kid: Kid) => [
+  { label: 'Challenges', value: kid.stats?.challenges ?? 0, icon: Trophy },
+  { label: 'Badges', value: kid.stats?.badges ?? 0, icon: Medal },
+  { label: 'Minutes outside', value: kid.stats?.outdoorMinutes ?? 0, icon: Clock },
+]
+
+onMounted(fetchKids)
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 pb-24">
-    <header class="relative flex items-center gap-4 px-6 py-6 md:px-10">
-      <div>
-        <p class="text-sm text-slate-500">Parent Dashboard</p>
-        <h1 class="text-2xl font-semibold">Hello, {{ parentName }}!</h1>
-      </div>
-      <div class="ml-auto flex items-center gap-3">
-        <button
-          class="hidden rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900 md:inline-flex"
-          @click="handleLogout"
-        >
-          Logout
-        </button>
-        <button
-          class="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-600"
-          @click="openAddKid"
-        >
-          <span class="text-lg">+</span>
-          Add Kid
-        </button>
-      </div>
-    </header>
+  <AppPage :title="title" eyebrow="Parent dashboard">
+    <template v-if="!isLoading && !error && kids.length" #actions>
+      <AppButton :icon="Plus" @click="$router.push({ name: 'add-kid' })">Add kid</AppButton>
+    </template>
 
-    <main class="px-6 pb-8 md:px-10">
-      <div v-if="isLoading" class="flex items-center justify-center py-16">
-        <div class="text-center">
-          <div
-            class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-emerald-500 border-r-transparent"
-          ></div>
-          <p class="mt-2 text-sm text-slate-500">Loading kids...</p>
+    <div
+      v-if="isLoading"
+      class="grid gap-4 md:grid-cols-2"
+      aria-busy="true"
+      aria-label="Loading kids"
+    >
+      <div v-for="n in 2" :key="n" class="rounded-lg bg-white p-5 shadow-sm">
+        <div class="flex items-center gap-4">
+          <SkeletonBlock class="size-12 rounded-full" />
+          <div class="space-y-2">
+            <SkeletonBlock class="h-5 w-28" />
+            <SkeletonBlock class="h-4 w-16" />
+          </div>
+        </div>
+        <div class="mt-5 grid grid-cols-3 gap-2">
+          <SkeletonBlock v-for="s in 3" :key="s" class="h-16 rounded-md" />
         </div>
       </div>
+    </div>
 
-      <div v-else-if="error" class="rounded-3xl bg-rose-50 p-6 text-center">
-        <p class="text-rose-600">{{ error }}</p>
-        <button
-          @click="fetchKids"
-          class="mt-4 rounded-full bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-600"
-        >
-          Try Again
-        </button>
-      </div>
+    <ErrorState v-else-if="error" :message="error" @retry="fetchKids" />
 
-      <section v-else-if="hasKids" class="grid gap-6 md:grid-cols-2">
-        <article
-          v-for="kid in kids"
-          :key="kid.id"
-          class="relative transform rounded-3xl bg-white p-6 shadow-lg shadow-slate-200 transition hover:-translate-y-1 hover:shadow-2xl"
-        >
-          <div class="absolute right-6 top-6 flex items-center gap-2">
-            <div
-              class="rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-600"
-            >
-              {{ (kid.points ?? 0).toLocaleString() }} pts
-            </div>
-            <button
-              @click.stop="handleEditKid(kid)"
-              class="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600 transition hover:bg-blue-200"
-              title="Edit kid"
-            >
-              ✏️
-            </button>
-            <button
-              @click.stop="handleDeleteKid(kid.id, kid.name)"
-              class="flex h-8 w-8 items-center justify-center rounded-full bg-rose-100 text-rose-600 transition hover:bg-rose-200"
-              title="Delete kid"
-            >
-              🗑️
-            </button>
-          </div>
-          <div class="flex items-center gap-4" @click="openKid(kid)">
-            <div
-              class="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br text-2xl font-bold text-white cursor-pointer"
-              :class="kid.avatarColor"
-            >
-              {{ kid.name.charAt(0) }}
-            </div>
-            <div class="cursor-pointer">
-              <p class="text-xs uppercase tracking-wide text-slate-400">Explorer</p>
-              <h2 class="text-xl font-semibold text-slate-900">{{ kid.name }}</h2>
-              <p class="text-sm text-slate-500">{{ kid.age }} years old</p>
-            </div>
-          </div>
-
-          <div class="mt-6 grid grid-cols-3 gap-3 text-center text-sm" @click="openKid(kid)">
-            <div class="rounded-2xl bg-emerald-50 px-2 py-3 cursor-pointer">
-              <p class="text-xs uppercase tracking-wide text-emerald-600">Challenges</p>
-              <p class="text-lg font-bold text-slate-900">{{ kid.stats?.challenges ?? 0 }}</p>
-            </div>
-            <div class="rounded-2xl bg-blue-50 px-2 py-3 cursor-pointer">
-              <p class="text-xs uppercase tracking-wide text-blue-600">Badges</p>
-              <p class="text-lg font-bold text-slate-900">{{ kid.stats?.badges ?? 0 }}</p>
-            </div>
-            <div class="rounded-2xl bg-amber-50 px-2 py-3 cursor-pointer">
-              <p class="text-xs uppercase tracking-wide text-amber-600">Outdoor</p>
-              <p class="text-lg font-bold text-slate-900">{{ kid.stats?.outdoorMinutes ?? 0 }}m</p>
-            </div>
-          </div>
-        </article>
-      </section>
-
-      <section
-        v-else-if="!isLoading && !error"
-        class="flex flex-col items-center justify-center rounded-3xl bg-white py-16 text-center shadow-lg shadow-slate-200"
+    <ul v-else-if="kids.length" class="grid gap-4 md:grid-cols-2">
+      <li
+        v-for="(kid, index) in kids"
+        :key="kid.id"
+        class="lift stagger relative animate-enter rounded-lg bg-white shadow-sm"
+        :style="{ '--i': index }"
       >
-        <div class="text-6xl">👨‍👩‍👧‍👦</div>
-        <h2 class="mt-4 text-2xl font-semibold text-slate-900">
-          Add your first kid to get started!
-        </h2>
-        <p class="mt-2 max-w-md text-sm text-slate-500">
-          Track progress, celebrate wins, and inspire outdoor adventures together.
-        </p>
-        <button
-          class="mt-6 inline-flex items-center gap-2 rounded-full bg-emerald-500 px-6 py-3 text-base font-semibold text-white shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-600"
-          @click="openAddKid"
+        <RouterLink
+          :to="{ name: 'kid-dashboard', params: { kidId: kid.id } }"
+          class="block rounded-lg p-5"
         >
-          <span class="text-lg">+</span>
-          Add Kid
-        </button>
-      </section>
-    </main>
+          <div class="flex items-center gap-4 pr-24">
+            <KidAvatar :name="kid.name" :color="kid.avatarColor" />
+            <div class="min-w-0">
+              <h2 class="truncate text-lg font-semibold text-ink-900">{{ kid.name }}</h2>
+              <p class="text-sm text-ink-500">
+                {{ kid.age }} years old · {{ (kid.points ?? 0).toLocaleString() }} pts
+              </p>
+            </div>
+          </div>
 
-    <nav
-      class="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white px-6 py-3 shadow-2xl shadow-slate-900/10 md:hidden"
+          <dl class="mt-5 grid grid-cols-3 gap-2">
+            <div v-for="stat in statsFor(kid)" :key="stat.label" class="rounded-md bg-ink-50 p-3">
+              <dt class="flex items-center gap-1 text-xs font-medium text-ink-500">
+                <component
+                  :is="stat.icon"
+                  :size="14"
+                  class="shrink-0 text-grass-600"
+                  aria-hidden="true"
+                />
+                <span class="truncate">{{ stat.label }}</span>
+              </dt>
+              <dd class="mt-1 text-lg font-semibold text-ink-900 tabular-nums">
+                {{ stat.value.toLocaleString() }}
+              </dd>
+            </div>
+          </dl>
+        </RouterLink>
+
+        <div class="absolute right-3 top-3 flex gap-1">
+          <AppButton
+            variant="ghost"
+            size="sm"
+            icon-only
+            :icon="Pencil"
+            :label="`Edit ${kid.name}`"
+            @click="$router.push({ name: 'edit-kid', params: { kidId: kid.id } })"
+          />
+          <AppButton
+            variant="ghost"
+            size="sm"
+            icon-only
+            :icon="Trash2"
+            :label="`Remove ${kid.name}`"
+            @click="requestDelete(kid)"
+          />
+        </div>
+      </li>
+    </ul>
+
+    <section
+      v-else
+      class="flex animate-enter flex-col items-center rounded-lg bg-white px-6 py-12 text-center shadow-sm"
     >
-      <div class="flex items-center justify-between">
-        <button
-          v-for="item in bottomNavItems"
-          :key="item.id"
-          class="flex flex-1 flex-col items-center gap-1 rounded-2xl px-2 py-1 text-xs font-medium transition"
-          :class="item.to && isActiveNav(item.to) ? 'text-emerald-600' : 'text-slate-400'"
-          @click="handleNavClick(item)"
-        >
-          <span class="text-lg">{{ item.icon }}</span>
-          {{ item.label }}
-        </button>
-      </div>
-    </nav>
-  </div>
+      <span
+        class="flex size-12 items-center justify-center rounded-full bg-grass-50 text-grass-600"
+      >
+        <Users :size="24" aria-hidden="true" />
+      </span>
+      <h2 class="mt-4 text-xl font-semibold text-ink-900">No kids added yet</h2>
+      <p class="mt-2 max-w-sm text-base text-ink-500">
+        Add a child to give them outdoor challenges and see how much time they spend outside.
+      </p>
+      <AppButton class="mt-6" :icon="Plus" @click="$router.push({ name: 'add-kid' })">
+        Add kid
+      </AppButton>
+    </section>
+
+    <ConfirmDialog
+      :open="!!kidPendingDelete"
+      :title="`Remove ${kidPendingDelete?.name ?? 'kid'}?`"
+      message="Their points, challenges and badges will be deleted. This can't be undone."
+      confirm-label="Remove"
+      :loading="isDeleting"
+      :error="deleteError"
+      @confirm="confirmDelete"
+      @cancel="kidPendingDelete = null"
+    />
+  </AppPage>
 </template>

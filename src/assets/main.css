@@ -1,7 +1,134 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+@import '@fontsource-variable/figtree';
 
+/*
+ * Touch Grass design system.
+ *
+ * Each scale below is reset with `initial` so Tailwind's defaults are not
+ * available. If a class is not generated, the value is not part of the system.
+ */
 @theme {
-  --color-primary: #10b981;
-  --color-secondary: #3b82f6;
-  --color-danger: #ef4444;
+  /* Color: one brand green, one warm-neutral ramp, one accent, one danger */
+  --color-*: initial;
+  --color-white: #ffffff;
+
+  --color-grass-50: #f0f7f1;
+  --color-grass-100: #dcefe0;
+  --color-grass-200: #b9dec3;
+  --color-grass-500: #3f9a5c;
+  --color-grass-600: #2f7f4a;
+  --color-grass-700: #25653b;
+
+  --color-ink-50: #f7f8f6;
+  --color-ink-100: #eef0ec;
+  --color-ink-200: #dfe3dc;
+  --color-ink-300: #c6ccc2;
+  --color-ink-400: #8f988b;
+  --color-ink-500: #636d60;
+  --color-ink-700: #3c4439;
+  --color-ink-900: #1c211b;
+
+  --color-sun-50: #fdf6e7;
+  --color-sun-700: #8f5f12;
+
+  --color-danger-50: #fdf1f0;
+  --color-danger-200: #f5c9c4;
+  --color-danger-600: #c2412f;
+  --color-danger-700: #a1321f;
+
+  /* Type: one family, six sizes, three weights */
+  --font-sans: 'Figtree Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --text-*: initial;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.875rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.25rem;
+
+  --font-weight-*: initial;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  /* Radius: controls (sm), inputs and buttons (md), surfaces (lg). Pills and avatars use rounded-full. */
+  --radius-*: initial;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1.25rem;
+
+  /* Elevation: resting surface and raised (hover / overlay) */
+  --shadow-*: initial;
+  --shadow-sm: 0 1px 2px rgb(28 33 27 / 0.06), 0 0 0 1px rgb(28 33 27 / 0.04);
+  --shadow-md: 0 8px 24px -8px rgb(28 33 27 / 0.18), 0 0 0 1px rgb(28 33 27 / 0.04);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --default-transition-duration: 160ms;
+  --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* `backwards` covers the stagger delay, then releases transform so `lift` can take over */
+  --animate-enter: enter 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-pulse: pulse 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  --animate-spin: spin 700ms linear infinite;
+
+  @keyframes enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+}
+
+/* List items set --i to their index; each step waits 50ms, capped at 6 steps so long lists don't lag. */
+@utility stagger {
+  animation-delay: calc(min(var(--i, 0), 6) * 50ms);
+}
+
+/* The only hover lift in the system: 2px, for surfaces that navigate somewhere. */
+@utility lift {
+  transition-property: transform, box-shadow;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-ink-50 font-sans text-base font-regular text-ink-900 antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-grass-500);
+    outline-offset: 2px;
+  }
+
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
 }
