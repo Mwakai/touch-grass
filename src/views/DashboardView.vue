@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Clock, Medal, Pencil, Plus, Trash2, Trophy, Users } from 'lucide-vue-next'
+import { Clock, Medal, Pencil, Plus, Trash2, Trophy, Users } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { api, type Kid } from '@/services/api'
 import AppPage from '@/components/layout/AppPage.vue'

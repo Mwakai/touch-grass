@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { Check } from 'lucide-vue-next'
+import { Check } from '@lucide/vue'
 import { avatarColors, defaultAvatarColorId, resolveAvatarColor } from '@/data/avatarColors'
 import { interestOptions } from '@/data/interests'
 import AppButton from '@/components/ui/AppButton.vue'

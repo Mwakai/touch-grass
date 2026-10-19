@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { Check, Copy, User, Users } from 'lucide-vue-next'
+import { Check, Copy, User, Users } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { getDefaultRouteForUser } from '@/utils/authRedirect'
 import AuthLayout from '@/components/layout/AuthLayout.vue'

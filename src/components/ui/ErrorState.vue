@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CircleAlert, RefreshCw } from 'lucide-vue-next'
+import { CircleAlert, RefreshCw } from '@lucide/vue'
 import AppButton from './AppButton.vue'
 
 defineProps<{ message: string }>()

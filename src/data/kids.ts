@@ -11,7 +11,7 @@ import {
   Telescope,
   Tent,
   Trees,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 
 export const activityIcons = {
   trees: Trees,

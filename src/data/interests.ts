@@ -1,5 +1,5 @@
 import type { Component } from 'vue'
-import { Bike, Leaf, Map, Palette, Volleyball } from 'lucide-vue-next'
+import { Bike, Leaf, Map, Palette, Volleyball } from '@lucide/vue'
 
 export type Interest = {
   id: string

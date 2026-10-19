@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Check, Clock, Lock, MapPin, Medal, SearchX, Star, Trophy } from 'lucide-vue-next'
+import { Check, Clock, Lock, MapPin, Medal, SearchX, Star, Trophy } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/services/api'
 import {

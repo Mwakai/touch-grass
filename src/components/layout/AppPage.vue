@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter, type RouteLocationRaw } from 'vue-router'
-import { ArrowLeft, LogOut } from 'lucide-vue-next'
+import { ArrowLeft, LogOut } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppLogo from '@/components/ui/AppLogo.vue'
