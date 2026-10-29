@@ -22,6 +22,11 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
       },
+      // Privacy policy parents accept at signup, served by the backend
+      '/privacy': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
     },
   },
 })

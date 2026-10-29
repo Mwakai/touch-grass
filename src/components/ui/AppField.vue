@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useId } from 'vue'
 
+// Bound manually below: v-model on type="number" would cast the value to a number
 const model = defineModel<string>({ default: '' })
 
 withDefaults(
@@ -29,7 +30,7 @@ const id = useId()
     <label :for="id" class="mb-2 block text-sm font-medium text-ink-700">{{ label }}</label>
     <input
       :id="id"
-      v-model="model"
+      :value="model"
       :type="type"
       :placeholder="placeholder"
       :disabled="disabled"
@@ -42,6 +43,7 @@ const id = useId()
       :aria-describedby="error || hint ? `${id}-note` : undefined"
       class="h-11 w-full rounded-md border bg-white px-3 text-base text-ink-900 transition-colors placeholder:text-ink-400 focus:border-grass-500 focus:outline-none disabled:bg-ink-100 disabled:text-ink-500"
       :class="[error ? 'border-danger-600' : 'border-ink-200 hover:border-ink-300', inputClass]"
+      @input="model = ($event.target as HTMLInputElement).value"
     />
     <p
       v-if="error || hint"

@@ -1,102 +1,88 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, watchEffect } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Check, Clock, Lock, MapPin, Medal, SearchX, Star, Trophy } from '@lucide/vue'
+import { Clock, Flame, SearchX } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
-import { api } from '@/services/api'
-import {
-  activityIcons,
-  getKidById,
-  mockKids,
-  type KidBadge,
-  type KidChallenge,
-  type KidStats,
-} from '@/data/kids'
+import { api, type Kid } from '@/services/api'
+import type { GameChallenge, GameSummary } from '@/data/game'
+import { useCelebrations } from '@/composables/useCelebrations'
 import AppPage from '@/components/layout/AppPage.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
-import KidAvatar from '@/components/ui/KidAvatar.vue'
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue'
-
-interface KidData {
-  id: string
-  name: string
-  age?: number
-  avatarColor: string
-  points: number
-  stats: KidStats
-  challenges: KidChallenge[]
-  badges: KidBadge[]
-}
-
-const emptyStats: KidStats = { challenges: 0, badges: 0, outdoorMinutes: 0 }
+import CelebrationOverlay from '@/components/game/CelebrationOverlay.vue'
+import ChallengeSheet from '@/components/game/ChallengeSheet.vue'
+import LevelShield from '@/components/game/LevelShield.vue'
+import PatchCollection from '@/components/game/PatchCollection.vue'
+import TrailMap from '@/components/game/TrailMap.vue'
+import XpBar from '@/components/game/XpBar.vue'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
 const isParent = computed(() => authStore.user?.role === 'parent')
+const isKid = computed(() => authStore.user?.role === 'kid')
 const kidId = computed(() => route.params.kidId as string | undefined)
-// Parents fetch from the API; start in the loading state so the page never flashes "not found"
-const isLoading = ref(isParent.value && !!kidId.value)
-const error = ref<string | null>(null)
-const fetchedKidData = ref<KidData | null>(null)
 
-const fetchKidData = async () => {
-  if (!kidId.value || !isParent.value) {
+// Start in the loading state so the page never flashes "not found"
+const isLoading = ref(isKid.value || (isParent.value && !!kidId.value))
+const error = ref<string | null>(null)
+const kid = ref<Kid | null>(null)
+const summary = ref<GameSummary | null>(null)
+
+const celebrations = useCelebrations(`touch-grass:seen:${authStore.user?.id ?? 'kid'}`)
+
+const load = async ({ quiet = false } = {}) => {
+  // Parents open a kid by id; kids always see their own linked profile
+  const requests = isKid.value
+    ? () => Promise.all([api.getMyKid(), api.getMyAdventure()])
+    : isParent.value && kidId.value
+      ? () =>
+          Promise.all([
+            api.getKid(kidId.value as string),
+            api.getKidAdventure(kidId.value as string),
+          ])
+      : null
+
+  if (!requests) {
     isLoading.value = false
     return
   }
 
-  isLoading.value = true
-  error.value = null
+  if (!quiet) {
+    isLoading.value = true
+    error.value = null
+  }
 
   try {
-    const kidFromApi = await api.getKid(kidId.value)
-    // Challenges and badges are not in the API yet, so they come from mock data
-    const mockKid = getKidById(kidId.value) || mockKids[0]
-
-    fetchedKidData.value = {
-      id: kidFromApi.id,
-      name: kidFromApi.name,
-      age: kidFromApi.age,
-      avatarColor: kidFromApi.avatarColor,
-      points: kidFromApi.points ?? 0,
-      stats: kidFromApi.stats ?? emptyStats,
-      challenges: mockKid?.challenges || [],
-      badges: mockKid?.badges || [],
-    }
+    const [profile, adventure] = await requests()
+    kid.value = profile
+    summary.value = adventure
+    if (isKid.value) celebrations.check(adventure)
   } catch (err: unknown) {
-    console.error('Failed to fetch kid:', err)
-    error.value = err instanceof Error ? err.message : 'Could not load this kid.'
+    console.error('Failed to load adventure:', err)
+    if (quiet) return
+    const message = err instanceof Error ? err.message : 'Could not load the adventure.'
+    // An unlinked kid account gets a 404; show the "not found" state instead of a retry
+    if (!(isKid.value && /not found/i.test(message))) {
+      error.value = message
+    }
   } finally {
     isLoading.value = false
   }
 }
 
-const kid = computed((): KidData | undefined => {
-  if (isParent.value) {
-    return fetchedKidData.value ?? undefined
-  }
+// Approvals happen on the parent's phone, so check again when the kid comes back
+const onVisible = () => {
+  if (document.visibilityState === 'visible' && summary.value) load({ quiet: true })
+}
 
-  if (authStore.user?.role === 'kid') {
-    const mockKid = kidId.value ? getKidById(kidId.value) : null
-    if (mockKid) return mockKid
-
-    return {
-      id: String(authStore.user.id),
-      name: authStore.user.name || authStore.user.email?.split('@')[0] || 'Explorer',
-      age: authStore.user.age,
-      avatarColor: '',
-      points: 0,
-      stats: emptyStats,
-      challenges: mockKids[0]?.challenges || [],
-      badges: [],
-    }
-  }
-
-  return kidId.value ? getKidById(kidId.value) : mockKids[0]
+onMounted(() => {
+  load()
+  document.addEventListener('visibilitychange', onVisible)
 })
+onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisible))
 
 watchEffect(() => {
   if (!authStore.user) {
@@ -104,176 +90,159 @@ watchEffect(() => {
   }
 })
 
-onMounted(fetchKidData)
+const view = ref<'trail' | 'patches'>('trail')
 
-const today = new Intl.DateTimeFormat('en-US', {
-  weekday: 'long',
-  month: 'long',
-  day: 'numeric',
-}).format(new Date())
+// Challenge sheet
+const selectedId = ref<string | null>(null)
+const selected = computed(() => {
+  for (const region of summary.value?.regions ?? []) {
+    const challenge = region.challenges.find((c) => c.id === selectedId.value)
+    if (challenge) return { challenge, region }
+  }
+  return null
+})
+const isSubmitting = ref(false)
+const submitError = ref<string | null>(null)
 
-const stats = computed(() => [
-  { label: 'Challenges', value: kid.value?.stats.challenges ?? 0, icon: Trophy },
-  { label: 'Badges', value: kid.value?.stats.badges ?? 0, icon: Medal },
-  { label: 'Minutes outside', value: kid.value?.stats.outdoorMinutes ?? 0, icon: Clock },
-])
+const openChallenge = (challenge: GameChallenge) => {
+  submitError.value = null
+  selectedId.value = challenge.id
+}
 
-const challengeTone = {
-  active: { card: 'bg-white shadow-sm', tile: 'bg-grass-50 text-grass-600', title: 'text-ink-900' },
-  completed: { card: 'bg-white shadow-sm', tile: 'bg-grass-600 text-white', title: 'text-ink-900' },
-  locked: { card: 'bg-ink-100', tile: 'bg-ink-200 text-ink-400', title: 'text-ink-500' },
-} satisfies Record<KidChallenge['status'], Record<string, string>>
+const submit = async (note: string) => {
+  if (!selectedId.value) return
+  isSubmitting.value = true
+  submitError.value = null
+  try {
+    // The sheet stays open and switches to "waiting for a grown-up"
+    summary.value = await api.submitChallenge(selectedId.value, note || undefined)
+  } catch (err: unknown) {
+    submitError.value = err instanceof Error ? err.message : 'That didn’t send. Try again.'
+  } finally {
+    isSubmitting.value = false
+  }
+}
 
+const initial = computed(() => kid.value?.name.trim().charAt(0).toUpperCase() || '?')
 const pageTitle = computed(() => (isLoading.value ? 'Loading' : (kid.value?.name ?? 'Explorer')))
+const eyebrow = computed(() =>
+  isParent.value ? `${kid.value?.name ?? 'Your kid'}’s adventure` : 'Your adventure',
+)
 </script>
 
 <template>
   <AppPage
     :title="pageTitle"
-    :eyebrow="today"
+    :eyebrow="eyebrow"
+    tone="adventure"
     :back-to="isParent ? { name: 'dashboard' } : undefined"
     back-label="Dashboard"
   >
-    <div v-if="isLoading" class="space-y-8" aria-busy="true" aria-label="Loading kid">
-      <div class="rounded-lg bg-white p-5 shadow-sm">
-        <div class="flex items-center gap-4">
-          <SkeletonBlock class="size-16 rounded-full" />
-          <div class="space-y-2">
-            <SkeletonBlock class="h-5 w-24" />
-            <SkeletonBlock class="h-4 w-32" />
-          </div>
-        </div>
-        <div class="mt-5 grid grid-cols-3 gap-2">
-          <SkeletonBlock v-for="n in 3" :key="n" class="h-16 rounded-md" />
-        </div>
-      </div>
-      <div class="space-y-3">
-        <SkeletonBlock class="h-6 w-40" />
-        <SkeletonBlock v-for="n in 3" :key="n" class="h-24 rounded-lg" />
-      </div>
+    <div v-if="isLoading" class="space-y-6" aria-busy="true" aria-label="Loading adventure">
+      <SkeletonBlock class="h-24 rounded-lg" />
+      <SkeletonBlock class="mx-auto h-[28rem] max-w-[22rem] rounded-lg" />
     </div>
 
-    <ErrorState v-else-if="error" :message="error" @retry="fetchKidData" />
+    <ErrorState v-else-if="error" :message="error" @retry="load()" />
 
-    <div v-else-if="kid" class="space-y-8">
-      <section class="animate-enter rounded-lg bg-white p-5 shadow-sm" aria-label="Summary">
-        <div class="flex items-center gap-4">
-          <KidAvatar :name="kid.name" :color="kid.avatarColor" size="lg" />
-          <div class="min-w-0 flex-1">
-            <p class="text-sm text-ink-500">{{ kid.age ? `${kid.age} years old` : 'Explorer' }}</p>
-            <p class="flex items-center gap-1 text-xl font-semibold text-ink-900 tabular-nums">
-              <Star :size="20" class="text-sun-700" aria-hidden="true" />
-              {{ kid.points.toLocaleString() }}
-              <span class="text-base font-medium text-ink-500">points</span>
-            </p>
-          </div>
+    <div v-else-if="kid && summary" class="space-y-4">
+      <!-- Level, XP and streak stay in view while the map scrolls -->
+      <section
+        class="sticky top-2 z-20 flex items-center gap-4 rounded-lg bg-meadow-50 p-3 shadow-md"
+        aria-label="Progress"
+      >
+        <LevelShield :level="summary.level" />
+        <div class="min-w-0 flex-1">
+          <XpBar
+            :xp="summary.xp"
+            :level="summary.level"
+            :level-xp="summary.levelXp"
+            :next-level-xp="summary.nextLevelXp"
+          />
         </div>
-
-        <dl class="mt-5 grid grid-cols-3 gap-2">
-          <div v-for="stat in stats" :key="stat.label" class="rounded-md bg-ink-50 p-3">
-            <dt class="flex items-center gap-1 text-xs font-medium text-ink-500">
-              <component
-                :is="stat.icon"
-                :size="14"
-                class="shrink-0 text-grass-600"
-                aria-hidden="true"
-              />
-              <span class="truncate">{{ stat.label }}</span>
-            </dt>
-            <dd class="mt-1 text-lg font-semibold text-ink-900 tabular-nums">
-              {{ stat.value.toLocaleString() }}
+        <dl class="flex shrink-0 flex-col items-end gap-1 text-sm font-semibold">
+          <div
+            class="flex items-center gap-1"
+            :class="summary.streak.current ? 'text-sun-700' : 'text-ink-400'"
+          >
+            <dt class="sr-only">Day streak</dt>
+            <Flame :size="16" aria-hidden="true" />
+            <dd class="tabular-nums">
+              {{ summary.streak.current }}
+              <span class="font-medium">{{ summary.streak.current === 1 ? 'day' : 'days' }}</span>
+            </dd>
+          </div>
+          <div class="flex items-center gap-1 text-forest-700">
+            <dt class="sr-only">Minutes outside</dt>
+            <Clock :size="16" aria-hidden="true" />
+            <dd class="tabular-nums">
+              {{ summary.stats.outdoorMinutes }} <span class="font-medium">min</span>
             </dd>
           </div>
         </dl>
       </section>
 
-      <section aria-labelledby="challenges-heading">
-        <h2 id="challenges-heading" class="text-lg font-semibold text-ink-900">
-          Today's challenges
-        </h2>
-        <ul class="mt-3 space-y-3">
-          <li
-            v-for="(challenge, index) in kid.challenges"
-            :key="challenge.id"
-            class="stagger flex animate-enter gap-4 rounded-lg p-4"
-            :class="challengeTone[challenge.status].card"
-            :style="{ '--i': index }"
-          >
-            <span
-              class="flex size-11 shrink-0 items-center justify-center rounded-md"
-              :class="challengeTone[challenge.status].tile"
-            >
-              <component :is="activityIcons[challenge.icon]" :size="20" aria-hidden="true" />
-            </span>
-            <div class="min-w-0 flex-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <h3 class="text-base font-semibold" :class="challengeTone[challenge.status].title">
-                  {{ challenge.title }}
-                </h3>
-                <span
-                  v-if="challenge.status === 'completed'"
-                  class="inline-flex items-center gap-1 rounded-full bg-grass-50 px-2 py-0.5 text-xs font-medium text-grass-700"
-                >
-                  <Check :size="12" aria-hidden="true" />
-                  Done
-                </span>
-                <span
-                  v-else-if="challenge.status === 'locked'"
-                  class="inline-flex items-center gap-1 rounded-full bg-ink-200 px-2 py-0.5 text-xs font-medium text-ink-500"
-                >
-                  <Lock :size="12" aria-hidden="true" />
-                  Locked
-                </span>
-              </div>
-              <p class="mt-1 text-sm text-ink-500">{{ challenge.description }}</p>
-              <p class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-500">
-                <span class="inline-flex items-center gap-1 font-medium text-sun-700">
-                  <Star :size="14" aria-hidden="true" />
-                  {{ challenge.points }} pts
-                </span>
-                <span v-if="challenge.distance" class="inline-flex items-center gap-1">
-                  <MapPin :size="14" aria-hidden="true" />
-                  {{ challenge.distance }}
-                </span>
-              </p>
-            </div>
-          </li>
-        </ul>
-      </section>
+      <div
+        class="mx-auto flex max-w-[22rem] rounded-full bg-meadow-200 p-1"
+        role="tablist"
+        aria-label="Adventure view"
+      >
+        <button
+          v-for="tab in [
+            { id: 'trail', label: 'Trail' },
+            { id: 'patches', label: 'Patches' },
+          ] as const"
+          :key="tab.id"
+          type="button"
+          role="tab"
+          :aria-selected="view === tab.id"
+          class="h-10 flex-1 rounded-full font-display text-lg transition-colors"
+          :class="view === tab.id ? 'bg-forest-900 text-sun-400' : 'text-forest-700'"
+          @click="view = tab.id"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
 
-      <section aria-labelledby="badges-heading">
-        <h2 id="badges-heading" class="text-lg font-semibold text-ink-900">Badges</h2>
-        <ul v-if="kid.badges.length" class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <li
-            v-for="(badge, index) in kid.badges"
-            :key="badge.id"
-            class="stagger flex animate-enter flex-col items-center rounded-lg bg-white p-4 text-center shadow-sm"
-            :style="{ '--i': index }"
-          >
-            <span
-              class="flex size-11 items-center justify-center rounded-full bg-sun-50 text-sun-700"
-            >
-              <component :is="activityIcons[badge.icon]" :size="20" aria-hidden="true" />
-            </span>
-            <p class="mt-2 text-sm font-medium text-ink-700">{{ badge.name }}</p>
-          </li>
-        </ul>
-        <p v-else class="mt-3 rounded-lg bg-ink-100 px-4 py-6 text-center text-sm text-ink-500">
-          No badges yet. Finishing challenges earns badges.
-        </p>
-      </section>
+      <TrailMap
+        v-if="view === 'trail'"
+        :regions="summary.regions"
+        :pin-label="initial"
+        @select="openChallenge"
+      />
+      <PatchCollection v-else :badges="summary.badges" class="mx-auto max-w-[22rem]" />
     </div>
 
     <div
       v-else
-      class="flex animate-enter flex-col items-center rounded-lg bg-white px-6 py-12 text-center shadow-sm"
+      class="flex animate-enter flex-col items-center rounded-lg bg-meadow-50 px-6 py-12 text-center"
     >
-      <SearchX :size="24" class="text-ink-400" aria-hidden="true" />
-      <h2 class="mt-4 text-xl font-semibold text-ink-900">Kid not found</h2>
-      <p class="mt-2 text-base text-ink-500">This profile may have been removed.</p>
+      <SearchX :size="24" class="text-forest-700" aria-hidden="true" />
+      <h2 class="mt-4 font-display text-2xl text-forest-900">
+        {{ isKid ? 'No map yet' : 'Kid not found' }}
+      </h2>
+      <p class="mt-2 text-base text-forest-700">
+        {{
+          isKid
+            ? 'Your account isn’t linked to a profile yet. Ask your parent for help.'
+            : 'This profile may have been removed.'
+        }}
+      </p>
       <AppButton v-if="isParent" class="mt-6" @click="router.push({ name: 'dashboard' })">
         Back to dashboard
       </AppButton>
     </div>
+
+    <ChallengeSheet
+      :challenge="selected?.challenge ?? null"
+      :region="selected?.region ?? null"
+      :readonly="!isKid"
+      :submitting="isSubmitting"
+      :error="submitError"
+      @close="selectedId = null"
+      @submit="submit"
+    />
+
+    <CelebrationOverlay :celebration="celebrations.current.value" @dismiss="celebrations.dismiss" />
   </AppPage>
 </template>

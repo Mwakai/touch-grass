@@ -6,12 +6,14 @@ import AppPage from '@/components/layout/AppPage.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue'
 import KidForm, { type KidFormValues } from '@/components/KidForm.vue'
+import KidLoginCard from '@/components/KidLoginCard.vue'
 
 const router = useRouter()
 const route = useRoute()
 const kidId = route.params.kidId as string
 
 const original = ref<KidFormValues | null>(null)
+const hasLogin = ref(false)
 const isLoading = ref(true)
 const loadError = ref<string | null>(null)
 const isSubmitting = ref(false)
@@ -31,6 +33,7 @@ const loadKid = async () => {
       avatarColor: kid.avatarColor || '',
       interests: kid.interests || [],
     }
+    hasLogin.value = Boolean(kid.account)
   } catch (error: unknown) {
     console.error('Failed to load kid:', error)
     loadError.value = error instanceof Error ? error.message : 'Could not load this kid.'
@@ -108,6 +111,14 @@ onMounted(loadKid)
       :submit-error="submitError"
       @submit="handleSubmit"
       @cancel="router.push({ name: 'dashboard' })"
+    />
+
+    <KidLoginCard
+      v-if="!isLoading && original"
+      :kid-id="kidId"
+      :kid-name="original.name"
+      :has-login="hasLogin"
+      @saved="hasLogin = true"
     />
   </AppPage>
 </template>

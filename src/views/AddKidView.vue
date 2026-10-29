@@ -3,19 +3,19 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/api'
 import AppPage from '@/components/layout/AppPage.vue'
-import KidForm, { type KidFormValues } from '@/components/KidForm.vue'
+import KidForm, { type KidFormValues, type KidSetupValues } from '@/components/KidForm.vue'
 
 const router = useRouter()
 
 const isSubmitting = ref(false)
 const submitError = ref<string | null>(null)
 
-const handleSubmit = async (values: KidFormValues) => {
+const handleSubmit = async (values: KidFormValues, setup?: KidSetupValues) => {
   isSubmitting.value = true
   submitError.value = null
 
   try {
-    await api.addKid(values)
+    await api.addKid({ ...values, consent: setup?.consent ?? false, ...setup })
     await router.push({ name: 'dashboard' })
   } catch (error: unknown) {
     console.error('Failed to add kid:', error)
@@ -35,6 +35,7 @@ const handleSubmit = async (values: KidFormValues) => {
     back-label="Dashboard"
   >
     <KidForm
+      setup
       submit-label="Add kid"
       submitting-label="Adding kid"
       :submitting="isSubmitting"

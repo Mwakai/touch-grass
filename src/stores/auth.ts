@@ -4,8 +4,10 @@ import { api } from '@/services/api'
 
 interface User {
   id: number | string
-  email: string
+  /** Parents only; kid accounts never have an email */
+  email?: string
   role: string
+  username?: string
   name?: string
   familyCode?: string
   parentId?: string
@@ -43,119 +45,73 @@ export const useAuthStore = defineStore('auth', () => {
   const isParent = computed(() => user.value?.role === 'parent')
   const isKid = computed(() => user.value?.role === 'kid')
 
+  // Pull the token and user out of a signup or login response and save them
+  const startSession = (response: AuthResponse) => {
+    let authToken = response.token
+    let userData: User | undefined = undefined
+
+    // Check if data is a User or contains nested auth data
+    if (response.data) {
+      if ('token' in response.data && typeof response.data.token === 'string') {
+        // data contains nested token
+        authToken = authToken || response.data.token
+      } else {
+        // data is the user object
+        userData = response.data as User
+      }
+    }
+
+    // Fallback: check if user is provided separately
+    if (!userData && response.user) {
+      userData = response.user
+    }
+
+    if (!authToken || !userData) {
+      console.error('Invalid auth response structure:', response)
+      throw new Error('Invalid response from server')
+    }
+
+    // Store token and user in localStorage
+    localStorage.setItem('token', authToken)
+    localStorage.setItem('user', JSON.stringify(userData))
+
+    // Update state
+    token.value = authToken
+    user.value = userData
+
+    return { token: authToken, user: userData }
+  }
+
+  // Run an auth request with shared loading and error state
+  const authenticate = async (request: () => Promise<unknown>, fallbackMessage: string) => {
+    loading.value = true
+    error.value = null
+
+    try {
+      return startSession((await request()) as AuthResponse)
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : fallbackMessage
+      console.error('Auth request failed in auth store:', err)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   // Actions
-  const login = async (email: string, password: string) => {
-    loading.value = true
-    error.value = null
+  const login = (email: string, password: string) =>
+    authenticate(() => api.login({ email, password }), 'Login failed. Please try again.')
 
-    try {
-      const response = (await api.login({ email, password })) as unknown as AuthResponse
+  // Kids log in with the family code plus the username and PIN their parent set
+  const kidLogin = (familyCode: string, username: string, pin: string) =>
+    authenticate(
+      () => api.kidLogin({ familyCode, username, pin }),
+      'Login failed. Please try again.',
+    )
 
-      let authToken = response.token
-      let userData: User | undefined = undefined
-
-      // Check if data is a User or contains nested auth data
-      if (response.data) {
-        if ('token' in response.data && typeof response.data.token === 'string') {
-          // data contains nested token
-          authToken = authToken || response.data.token
-        } else {
-          // data is the user object
-          userData = response.data as User
-        }
-      }
-
-      // Fallback: check if user is provided separately
-      if (!userData && response.user) {
-        userData = response.user
-      }
-
-      if (!authToken || !userData) {
-        console.error('Invalid login response structure:', response)
-        throw new Error('Invalid response from server')
-      }
-
-      // Store token in localStorage
-      localStorage.setItem('token', authToken)
-      localStorage.setItem('user', JSON.stringify(userData))
-
-      // Update state
-      token.value = authToken
-      user.value = userData
-
-      return { token: authToken, user: userData }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Login failed. Please try again.'
-      error.value = message
-      console.error('Login failed in auth store:', err)
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  interface SignupParams {
-    email: string
-    password: string
-    role: string
-    familyCode?: string
-    name?: string
-    age?: number
-    interests?: string[]
-    avatarColor?: string
-  }
-
-  const signup = async (params: SignupParams) => {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = (await api.signup(params)) as unknown as AuthResponse
-
-      // Handle different response structures
-      // Backend returns: {success: true, token: "...", data: {id, email, role, ...}}
-      let authToken = response.token
-      let userData: User | undefined = undefined
-
-      // Check if data is a User or contains nested auth data
-      if (response.data) {
-        if ('token' in response.data && typeof response.data.token === 'string') {
-          // data contains nested token
-          authToken = authToken || response.data.token
-        } else {
-          // data is the user object
-          userData = response.data as User
-        }
-      }
-
-      // Fallback: check if user is provided separately
-      if (!userData && response.user) {
-        userData = response.user
-      }
-
-      if (!authToken || !userData) {
-        console.error('Invalid signup response structure:', response)
-        throw new Error('Invalid response from server')
-      }
-
-      // Store token and user in localStorage
-      localStorage.setItem('token', authToken)
-      localStorage.setItem('user', JSON.stringify(userData))
-
-      // Update state
-      token.value = authToken
-      user.value = userData
-
-      return { token: authToken, user: userData }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Signup failed. Please try again.'
-      error.value = message
-      console.error('Signup failed in auth store:', err)
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
+  // Only parents sign up; kids get a login from their parent
+  const signup = (params: { email: string; password: string; consent: boolean }) =>
+    authenticate(() => api.signup(params), 'Signup failed. Please try again.')
 
   const logout = async () => {
     try {
@@ -174,6 +130,12 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = null
       error.value = null
     }
+  }
+
+  // Deletes the parent's account and all their kids' data, then signs out
+  const deleteAccount = async () => {
+    await api.deleteAccount()
+    await logout()
   }
 
   const fetchUser = async () => {
@@ -242,8 +204,10 @@ export const useAuthStore = defineStore('auth', () => {
     isKid,
     // Actions
     login,
+    kidLogin,
     signup,
     logout,
+    deleteAccount,
     fetchUser,
     initAuth,
   }

@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import '@fontsource-variable/figtree';
+@import '@fontsource/lilita-one';
 
 /*
  * Touch Grass design system.
@@ -36,8 +37,33 @@
   --color-danger-600: #c2412f;
   --color-danger-700: #a1321f;
 
-  /* Type: one family, six sizes, three weights */
+  /*
+   * Kid adventure palette, taken from a printed trail map: meadow paper,
+   * forest ink, bark trail, sun for XP and the "you are here" pin, river sky
+   * for "waiting for a grown-up". Only the kid screens use these.
+   */
+  --color-meadow-50: #f3f9ea;
+  --color-meadow-100: #e7f2d5;
+  --color-meadow-200: #cfe5b0;
+  --color-meadow-300: #b4d58c;
+
+  --color-forest-700: #2a6340;
+  --color-forest-900: #1e4d2e;
+
+  --color-bark-300: #c9a27c;
+  --color-bark-500: #8a5a34;
+  --color-bark-700: #6b4325;
+
+  --color-sun-100: #fdebb8;
+  --color-sun-400: #f5b51e;
+
+  --color-sky-50: #eaf5fc;
+  --color-sky-500: #4fa9de;
+  --color-sky-700: #1f6f9e;
+
+  /* Type: Figtree for everything; Lilita One (park-sign lettering) only on the kid screens */
   --font-sans: 'Figtree Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Lilita One', 'Figtree Variable', ui-sans-serif, system-ui, sans-serif;
 
   --text-*: initial;
   --text-xs: 0.75rem;
@@ -52,6 +78,11 @@
   --text-xl--line-height: 1.875rem;
   --text-2xl: 1.75rem;
   --text-2xl--line-height: 2.25rem;
+  /* Display sizes for the kid screens' signposts, level shield and celebrations */
+  --text-3xl: 2.25rem;
+  --text-3xl--line-height: 2.5rem;
+  --text-4xl: 3.5rem;
+  --text-4xl--line-height: 1;
 
   --font-weight-*: initial;
   --font-weight-regular: 400;
@@ -79,11 +110,34 @@
   --animate-enter: enter 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
   --animate-pulse: pulse 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
   --animate-spin: spin 700ms linear infinite;
+  /* Kid screens: the "you are here" pin bobs; sheets slide up; rewards pop in */
+  --animate-bob: bob 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  --animate-sheet: sheet 280ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-pop: pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 
   @keyframes enter {
     from {
       opacity: 0;
       transform: translateY(6px);
+    }
+  }
+
+  @keyframes bob {
+    50% {
+      transform: translateY(-5px);
+    }
+  }
+
+  @keyframes sheet {
+    from {
+      transform: translateY(100%);
+    }
+  }
+
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: scale(0.6) rotate(-8deg);
     }
   }
 }

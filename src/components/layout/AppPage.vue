@@ -10,12 +10,17 @@ import AppLogo from '@/components/ui/AppLogo.vue'
  * Shell for every signed-in page, so the top bar, back link, title and
  * page actions always sit in the same place.
  */
-defineProps<{
-  title: string
-  eyebrow?: string
-  backTo?: RouteLocationRaw
-  backLabel?: string
-}>()
+withDefaults(
+  defineProps<{
+    title: string
+    eyebrow?: string
+    backTo?: RouteLocationRaw
+    backLabel?: string
+    /** `adventure` puts the page on the kid screens' trail-map meadow. */
+    tone?: 'calm' | 'adventure'
+  }>(),
+  { tone: 'calm' },
+)
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -31,8 +36,11 @@ const handleLogout = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen pb-16">
-    <header class="border-b border-ink-200 bg-white">
+  <div class="min-h-screen pb-16" :class="tone === 'adventure' && 'bg-meadow-100'">
+    <header
+      class="border-b"
+      :class="tone === 'adventure' ? 'border-meadow-200 bg-meadow-50' : 'border-ink-200 bg-white'"
+    >
       <div class="mx-auto flex h-16 max-w-4xl items-center justify-between px-4 sm:px-6">
         <AppLogo />
         <AppButton

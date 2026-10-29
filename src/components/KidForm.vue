@@ -3,6 +3,8 @@ import { reactive, ref } from 'vue'
 import { Check } from '@lucide/vue'
 import { avatarColors, defaultAvatarColorId, resolveAvatarColor } from '@/data/avatarColors'
 import { interestOptions } from '@/data/interests'
+import { api } from '@/services/api'
+import { normalizeUsername, pinError, usernameError } from '@/utils/kidLogin'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppField from '@/components/ui/AppField.vue'
 import KidAvatar from '@/components/ui/KidAvatar.vue'
@@ -14,24 +16,41 @@ export type KidFormValues = {
   interests: string[]
 }
 
+// Only collected when adding a kid
+export type KidSetupValues = {
+  consent: boolean
+  username?: string
+  pin?: string
+}
+
 const props = defineProps<{
   initial?: Partial<KidFormValues>
+  /** Adding a new kid: ask for consent and offer to create their login. */
+  setup?: boolean
   submitLabel: string
   submittingLabel: string
   submitting: boolean
   submitError?: string | null
 }>()
 
-const emit = defineEmits<{ submit: [values: KidFormValues]; cancel: [] }>()
+const emit = defineEmits<{
+  submit: [values: KidFormValues, setup?: KidSetupValues]
+  cancel: []
+}>()
 
 const form = reactive({
   name: props.initial?.name ?? '',
   age: props.initial?.age ? String(props.initial.age) : '',
   avatarColor: resolveAvatarColor(props.initial?.avatarColor ?? defaultAvatarColorId).id,
   interests: [...(props.initial?.interests ?? [])],
+  username: '',
+  pin: '',
+  consent: false,
 })
 
-const errors = ref<Partial<Record<'name' | 'age' | 'interests', string>>>({})
+const errors = ref<
+  Partial<Record<'name' | 'age' | 'interests' | 'username' | 'pin' | 'consent', string>>
+>({})
 
 const toggleInterest = (interestId: string) => {
   form.interests = form.interests.includes(interestId)
@@ -48,14 +67,34 @@ const handleSubmit = () => {
   if (!age || age < 1 || age > 18) nextErrors.age = 'Enter an age between 1 and 18'
   if (!form.interests.length) nextErrors.interests = 'Pick at least one interest'
 
-  errors.value = nextErrors
-  if (Object.keys(nextErrors).length) return
+  // The login is optional, but needs both parts once either is filled in
+  const wantsLogin = props.setup && Boolean(form.username.trim() || form.pin)
+  if (wantsLogin) {
+    nextErrors.username = usernameError(form.username)
+    nextErrors.pin = pinError(form.pin)
+  }
+  if (props.setup && !form.consent) {
+    nextErrors.consent = 'Confirm you’re their parent or guardian to add them'
+  }
 
-  emit('submit', {
+  errors.value = Object.fromEntries(Object.entries(nextErrors).filter(([, message]) => message))
+  if (Object.keys(errors.value).length) return
+
+  const values = {
     name: form.name.trim(),
     age,
     avatarColor: form.avatarColor,
     interests: form.interests,
+  }
+
+  if (!props.setup) {
+    emit('submit', values)
+    return
+  }
+
+  emit('submit', values, {
+    consent: true,
+    ...(wantsLogin && { username: normalizeUsername(form.username), pin: form.pin }),
   })
 }
 </script>
@@ -148,6 +187,63 @@ const handleSubmit = () => {
       </div>
       <p v-if="errors.interests" class="mt-2 text-sm text-danger-600">{{ errors.interests }}</p>
     </fieldset>
+
+    <template v-if="setup">
+      <fieldset class="mt-8 border-t border-ink-200 pt-6">
+        <legend class="sr-only">Their login</legend>
+        <p class="text-sm font-medium text-ink-700">Their login</p>
+        <p class="mt-1 text-sm text-ink-500">
+          Kids log in with your family code, this username and PIN. No email needed. You can also
+          add it later.
+        </p>
+        <div class="mt-4 grid gap-6 sm:grid-cols-[1fr_8rem]">
+          <AppField
+            v-model="form.username"
+            label="Username"
+            autocomplete="off"
+            :maxlength="20"
+            :error="errors.username"
+            :disabled="submitting"
+            @update:model-value="errors.username = undefined"
+          />
+          <AppField
+            v-model="form.pin"
+            label="PIN"
+            inputmode="numeric"
+            autocomplete="off"
+            :maxlength="4"
+            input-class="font-mono tracking-widest"
+            :error="errors.pin"
+            :disabled="submitting"
+            @update:model-value="errors.pin = undefined"
+          />
+        </div>
+      </fieldset>
+
+      <div class="mt-8 border-t border-ink-200 pt-6">
+        <label class="flex items-start gap-3 text-sm text-ink-700">
+          <input
+            v-model="form.consent"
+            type="checkbox"
+            class="mt-0.5 size-5 shrink-0 accent-grass-600"
+            :disabled="submitting"
+            @change="errors.consent = undefined"
+          />
+          <span>
+            I’m this child’s parent or guardian and I agree to Touch Grass storing their name, age,
+            interests and challenge history as described in the
+            <a
+              :href="api.privacyPolicyUrl"
+              target="_blank"
+              rel="noopener"
+              class="font-semibold text-grass-700 underline hover:text-grass-600"
+              >privacy policy</a
+            >.
+          </span>
+        </label>
+        <p v-if="errors.consent" class="mt-2 text-sm text-danger-600">{{ errors.consent }}</p>
+      </div>
+    </template>
 
     <p
       v-if="submitError"
