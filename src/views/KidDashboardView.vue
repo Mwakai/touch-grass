@@ -204,13 +204,15 @@ const eyebrow = computed(() =>
         </button>
       </div>
 
-      <TrailMap
-        v-if="view === 'trail'"
-        :regions="summary.regions"
-        :pin-label="initial"
-        @select="openChallenge"
-      />
-      <PatchCollection v-else :badges="summary.badges" class="mx-auto max-w-[22rem]" />
+      <Transition name="fade" mode="out-in">
+        <TrailMap
+          v-if="view === 'trail'"
+          :regions="summary.regions"
+          :pin-label="initial"
+          @select="openChallenge"
+        />
+        <PatchCollection v-else :badges="summary.badges" class="mx-auto max-w-[22rem]" />
+      </Transition>
     </div>
 
     <div

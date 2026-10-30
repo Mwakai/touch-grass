@@ -169,57 +169,59 @@ const clearError = () => {
     </div>
 
     <form class="mt-6 space-y-4" novalidate @submit.prevent="handleLogin">
-      <template v-if="mode === 'kid'">
-        <AppField
-          v-model="familyCode"
-          label="Family code"
-          hint="Your grown-up can find this on their dashboard."
-          autocomplete="off"
-          :maxlength="10"
-          input-class="font-mono uppercase tracking-widest"
-          :disabled="authStore.loading"
-          @update:model-value="clearError"
-        />
-        <AppField
-          v-model="username"
-          label="Username"
-          autocomplete="username"
-          :maxlength="20"
-          :disabled="authStore.loading"
-          @update:model-value="clearError"
-        />
-        <AppField
-          v-model="pin"
-          label="PIN"
-          type="password"
-          inputmode="numeric"
-          autocomplete="current-password"
-          :maxlength="4"
-          input-class="font-mono tracking-widest"
-          :disabled="authStore.loading"
-          @update:model-value="clearError"
-        />
-      </template>
+      <Transition name="fade" mode="out-in">
+        <div v-if="mode === 'kid'" key="kid" class="space-y-4">
+          <AppField
+            v-model="familyCode"
+            label="Family code"
+            hint="Your grown-up can find this on their dashboard."
+            autocomplete="off"
+            :maxlength="10"
+            input-class="font-mono uppercase tracking-widest"
+            :disabled="authStore.loading"
+            @update:model-value="clearError"
+          />
+          <AppField
+            v-model="username"
+            label="Username"
+            autocomplete="username"
+            :maxlength="20"
+            :disabled="authStore.loading"
+            @update:model-value="clearError"
+          />
+          <AppField
+            v-model="pin"
+            label="PIN"
+            type="password"
+            inputmode="numeric"
+            autocomplete="current-password"
+            :maxlength="4"
+            input-class="font-mono tracking-widest"
+            :disabled="authStore.loading"
+            @update:model-value="clearError"
+          />
+        </div>
 
-      <template v-else>
-        <AppField
-          v-model="email"
-          label="Email"
-          type="email"
-          autocomplete="email"
-          inputmode="email"
-          :disabled="authStore.loading"
-          @update:model-value="clearError"
-        />
-        <AppField
-          v-model="password"
-          label="Password"
-          type="password"
-          autocomplete="current-password"
-          :disabled="authStore.loading"
-          @update:model-value="clearError"
-        />
-      </template>
+        <div v-else key="parent" class="space-y-4">
+          <AppField
+            v-model="email"
+            label="Email"
+            type="email"
+            autocomplete="email"
+            inputmode="email"
+            :disabled="authStore.loading"
+            @update:model-value="clearError"
+          />
+          <AppField
+            v-model="password"
+            label="Password"
+            type="password"
+            autocomplete="current-password"
+            :disabled="authStore.loading"
+            @update:model-value="clearError"
+          />
+        </div>
+      </Transition>
 
       <p
         v-if="error"

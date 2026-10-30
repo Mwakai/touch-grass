@@ -32,24 +32,25 @@ watch(
 
 <template>
   <Teleport to="body">
-    <Transition
-      enter-active-class="transition-opacity duration-200 ease-out"
-      leave-active-class="transition-opacity duration-150 ease-in-out"
-      enter-from-class="opacity-0"
-      leave-to-class="opacity-0"
-    >
+    <Transition name="dialog" :duration="{ enter: 280, leave: 200 }">
       <div
         v-if="open"
-        class="fixed inset-0 z-50 flex items-end justify-center bg-ink-900/40 p-4 sm:items-center"
-        @click.self="cancel"
+        class="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
         @keydown.esc="cancel"
       >
         <div
+          data-backdrop
+          class="absolute inset-0 bg-ink-900/40"
+          aria-hidden="true"
+          @click="cancel"
+        />
+        <div
+          data-panel
           role="alertdialog"
           aria-modal="true"
           :aria-labelledby="`${id}-title`"
           :aria-describedby="`${id}-message`"
-          class="w-full max-w-sm animate-enter rounded-lg bg-white p-6 shadow-md"
+          class="relative w-full max-w-sm rounded-lg bg-white p-6 shadow-md"
         >
           <h2 :id="`${id}-title`" class="text-lg font-semibold text-ink-900">{{ title }}</h2>
           <p :id="`${id}-message`" class="mt-2 text-base text-ink-500">{{ message }}</p>
